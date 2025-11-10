@@ -28,9 +28,16 @@ export default function EventDetailScreen() {
         setLoading(true);
         const data = await ApiService.getEventById(eventId, user?.username);
         setEvent(data);
-        // TODO: Check if user is participating from server response
-        setIsInterested(false);
-        setIsJoined(false);
+        
+        // Check if user is participating
+        if (user?.username && data.participants) {
+          const userParticipation = data.participants.find(p => p.username === user.username);
+          if (userParticipation) {
+            // User is in the participants list
+            setIsJoined(true);
+            setIsInterested(true);
+          }
+        }
       } catch (error) {
         console.error('Error loading event:', error);
         Alert.alert('Error', 'Failed to load event details');

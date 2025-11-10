@@ -23,8 +23,12 @@ export default function ProfileScreen() {
         setLoading(true);
         const data = await ApiService.getUserById(userId);
         setUser(data);
-        // TODO: Check if current user is following this user
-        setIsFollowing(false);
+        
+        // Check if current user is following this user
+        if (currentUser?.username && data.username) {
+          const following = await ApiService.isFollowing(data.username, currentUser.username);
+          setIsFollowing(following);
+        }
       } catch (error) {
         console.error('Error loading user:', error);
         Alert.alert('Error', 'Failed to load user profile');
@@ -34,24 +38,22 @@ export default function ProfileScreen() {
     };
 
     loadUser();
-  }, [userId]);
+  }, [userId, currentUser?.username]);
 
-  const handleMessage = async () => {
-    if (!user || !currentUser?.username) return;
-    
-    try {
-      // Create or get existing conversation
-      const conversation = await ApiService.createConversation(
-        'dm',
-        currentUser.username,
-        [currentUser.username, user.username || '']
-      );
-      router.push(`/chat?id=${conversation.id}`);
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      Alert.alert('Error', 'Failed to start chat');
-    }
-  };
+    const handleMessage = async () => {
+      if (!user?.username || !currentUser?.username) return;
+
+      try {
+        const conv = await ApiService.createOrGetDirectConversation(
+          currentUser.username,
+          user.username
+        );
+        router.push(`/chat?id=${conv.id}`);
+      } catch (error) {
+        console.error('Error creating/getting DM conversation:', error);
+        Alert.alert('Error', 'Failed to open chat');
+      }
+    };
 
   const handleFollow = async () => {
     if (!user?.username || !currentUser?.username) return;
@@ -60,9 +62,13 @@ export default function ProfileScreen() {
       if (isFollowing) {
         await ApiService.unfollowUser(user.username, currentUser.username);
         setIsFollowing(false);
+        // Update follower count
+        setUser(prev => prev ? { ...prev, followersCount: (prev.followersCount || 1) - 1 } : null);
       } else {
         await ApiService.followUser(user.username, currentUser.username);
         setIsFollowing(true);
+        // Update follower count
+        setUser(prev => prev ? { ...prev, followersCount: (prev.followersCount || 0) + 1 } : null);
       }
     } catch (error) {
       console.error('Error following/unfollowing:', error);

@@ -29,6 +29,57 @@ class ApiService {
         'Content-Type': 'application/json',
       },
     });
+
+    // Add request interceptor for logging
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error('API Request Error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Add response interceptor for error handling
+    this.client.interceptors.response.use(
+      (response) => {
+        return response;
+      },
+      async (error) => {
+        const originalRequest = error.config;
+        
+        if (error.response) {
+          // Server responded with error
+          console.error('API Response Error:', error.response.status, error.response.data);
+          
+          // If 401 Unauthorized, user might need to re-login
+          if (error.response.status === 401 && !originalRequest._retry) {
+            console.warn('Unauthorized - Token may be expired');
+            // Don't retry, let the app handle re-login
+          }
+        } else if (error.request) {
+          // Request made but no response - possibly network issue
+          console.error('API No Response:', error.message);
+          
+          // Retry once for network errors
+          if (!originalRequest._retry) {
+            originalRequest._retry = true;
+            try {
+              console.log('Retrying request...');
+              return this.client(originalRequest);
+            } catch (retryError) {
+              console.error('Retry failed:', retryError);
+            }
+          }
+        } else {
+          // Error in request setup
+          console.error('API Request Setup Error:', error.message);
+        }
+        return Promise.reject(error);
+      }
+    );
   }
 
   setAuthToken(token: string) {
@@ -114,6 +165,26 @@ class ApiService {
     await this.client.delete(`/users/${username}/follow`, { data: { followerUsername } });
   }
 
+  async isFollowing(username: string, followerUsername: string): Promise<boolean> {
+    try {
+      const response = await this.client.get(`/users/${username}/following/${followerUsername}`);
+      return response.data.isFollowing || false;
+    } catch (error) {
+      console.error('Error checking follow status:', error);
+      return false;
+    }
+  }
+   // Create or get existing direct conversation with otherUsername
+  async createOrGetDirectConversation(currentUsername: string, otherUsername: string): Promise<{ id: string | number }> {
+    const response = await this.client.post('/messages/conversations', {
+      type: 'dm',
+      created_by: currentUsername,
+      members: [otherUsername],
+    });
+    // Server có thể trả { reused: true, id, ... } hoặc { id, ... }
+    const data = response.data;
+    return { id: data.id };
+  }
   async updateHangoutStatus(
     username: string,
     isAvailable: boolean,
@@ -228,15 +299,82 @@ class ApiService {
   }
 
   // Chat endpoints
-  async getConversations(username: string): Promise<Chat[]> {
+ async getConversations(username: string): Promise<Chat[]> {
     const response = await this.client.get('/messages/conversations', { params: { user: username } });
-    return response.data;
+    const raw = response.data;
+
+    return (raw || []).map((c: any) => {
+      const last = c.last_message
+        ? {
+            id: String(c.last_message.id),
+            chatId: String(c.last_message.conversation_id ?? c.id),
+            senderId: c.last_message.sender_username,
+            sender: {
+              id: c.last_message.sender?.id ?? c.last_message.sender_username,
+              username: c.last_message.sender?.username ?? c.last_message.sender_username,
+              name: c.last_message.sender?.name ?? c.last_message.sender_username,
+              avatar: c.last_message.sender?.avatar ?? '',
+              // Các field khác có thể bổ sung sau nếu cần
+              email: (c.last_message.sender?.username || 'unknown') + '@example.com',
+              country: '',
+              city: '',
+              status: 'Chilling',
+              languages: [],
+              interests: [],
+            },
+            content: c.last_message.content || '',
+            image: c.last_message.message_media?.[0]?.media_url,
+            timestamp: c.last_message.created_at, 
+            read: false,
+          }
+        : undefined;
+
+      return {
+        id: String(c.id),
+        type: c.type === 'dm' ? 'user' : c.type === 'group' ? 'group' : (c.type || 'user'),
+        name: c.title || undefined,
+        participants: [], 
+        lastMessage: last,
+        unreadCount: c.unread_count ?? 0,
+        eventId: undefined,
+      } as Chat;
+    });
   }
 
-  async getChatMessages(conversationId: string): Promise<Message[]> {
-    const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
-    return response.data;
-  }
+async getConversation(conversationId: string): Promise<Chat> {
+  const response = await this.client.get(`/messages/conversations/${conversationId}`);
+  const c = response.data;
+  return {
+    id: String(c.id),
+    type: c.type === 'dm' ? 'user' : c.type === 'group' ? 'group' : c.type,
+    name: c.title || undefined,
+    participants: (c.participants || []).map((p: any) => ({
+      id: p.id,
+      username: p.username,
+      name: p.name,
+      avatar: p.avatar,
+    })),
+  };
+}
+
+async getChatMessages(conversationId: string): Promise<Message[]> {
+  const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
+  return response.data.map((m: any) => ({
+    id: String(m.id),
+    chatId: String(m.chatId),
+    senderId: m.senderId,
+    sender: {
+      id: m.sender?.id,
+      username: m.sender?.username,
+      name: m.sender?.name,
+      avatar: m.sender?.avatar,
+    },
+    content: m.content,
+    image: m.image,
+    timestamp: m.timestamp,
+    read: m.read ?? false,
+  }));
+}
 
   async sendMessage(conversationId: string, senderUsername: string, content: string, replyToMessageId?: string): Promise<void> {
     await this.client.post(`/messages/conversations/${conversationId}/messages`, {

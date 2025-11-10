@@ -1,44 +1,33 @@
-import { format, formatDistance as formatDistanceFns, parseISO } from 'date-fns';
+import { formatDistance as formatDistanceFns, format, parseISO } from 'date-fns';
 
 /**
- * Format date for display
+ * Trả về chuỗi thời gian tương đối (vd: "5 minutes ago").
+ * An toàn với input không hợp lệ: trả chuỗi rỗng nếu không parse được.
  */
-export const formatDate = (date: string | Date): string => {
+export const getRelativeTime = (date: string | Date | undefined | null): string => {
+  if (!date) return '';
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  return format(dateObj, 'dd-MM-yyyy');
-};
-
-/**
- * Format time for display
- */
-export const formatTime = (date: string | Date): string => {
-  const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  return format(dateObj, 'hh:mm a');
-};
-
-/**
- * Format date and time for display
- */
-export const formatDateTime = (date: string | Date): string => {
-  const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  return format(dateObj, 'dd-MM-yyyy hh:mm a');
-};
-
-/**
- * Get relative time (e.g., "2 hours ago")
- */
-export const getRelativeTime = (date: string | Date): string => {
-  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
   return formatDistanceFns(dateObj, new Date(), { addSuffix: true });
 };
 
 /**
- * Format schedule string (e.g., "weekly 07:30 PM - 11:30 PM")
+ * Định dạng thời gian theo pattern (mặc định HH:mm).
+ * An toàn với input không hợp lệ: trả chuỗi rỗng nếu không parse được.
+ * Ví dụ: formatTime('2025-11-01T10:00:00Z') => '10:00'
  */
-export const formatSchedule = (
-  frequency: string,
-  startTime: string,
-  endTime: string
+export const formatTime = (
+  date: string | Date | undefined | null,
+  pattern: string = 'HH:mm'
 ): string => {
-  return `${frequency} ${startTime} - ${endTime}`;
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
+  return format(dateObj, pattern);
 };
+
+/**
+ * Alias nếu bạn đang dùng tên formatTimestamp ở nơi khác.
+ * Thực chất dùng cùng logic với formatTime.
+ */
+export const formatTimestamp = formatTime;

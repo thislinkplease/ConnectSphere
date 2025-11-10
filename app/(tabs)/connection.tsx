@@ -6,9 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { User } from '@/src/types';
 import ApiService from '@/src/services/api';
 import LocationService from '@/src/services/location';
+import { useAuth } from '@/src/context/AuthContext';
 
 export default function ConnectionScreen() {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,6 +19,7 @@ export default function ConnectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [followingUsers, setFollowingUsers] = useState<Set<string>>(new Set());
   
   // Filters
   const [selectedDistance, setSelectedDistance] = useState<number | null>(null);
@@ -119,64 +122,105 @@ export default function ConnectionScreen() {
     setRefreshing(false);
   }, [loadUsers]);
 
-  const renderUserCard = ({ item }: { item: User & { distance?: number } }) => (
-    <TouchableOpacity 
-      style={styles.userCard}
-      onPress={() => router.push(`/profile?id=${item.id}`)}
-    >
-      <Image source={{ uri: item.avatar }} style={styles.userAvatar} />
-      <View style={styles.userContent}>
-        <View style={styles.userHeader}>
-          <Text style={styles.userName}>{item.name}</Text>
-          {item.isAvailableToHangout && (
-            <View style={styles.availableBadge}>
-              <View style={styles.availableDot} />
-              <Text style={styles.availableText}>Available</Text>
+  const handleFollowToggle = async (user: User, event: any) => {
+    event.stopPropagation(); // Prevent navigation to profile
+    
+    if (!currentUser?.username || !user.username) return;
+    
+    const isFollowing = followingUsers.has(user.id);
+    
+    try {
+      if (isFollowing) {
+        await ApiService.unfollowUser(user.username, currentUser.username);
+        setFollowingUsers(prev => {
+          const next = new Set(prev);
+          next.delete(user.id);
+          return next;
+        });
+      } else {
+        await ApiService.followUser(user.username, currentUser.username);
+        setFollowingUsers(prev => new Set(prev).add(user.id));
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      Alert.alert('Error', 'Failed to update follow status');
+    }
+  };
+
+  const renderUserCard = ({ item }: { item: User & { distance?: number } }) => {
+    const isFollowing = followingUsers.has(item.id);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.userCard}
+        onPress={() => router.push(`/profile?id=${item.id}`)}
+      >
+        <Image source={{ uri: item.avatar }} style={styles.userAvatar} />
+        <View style={styles.userContent}>
+          <View style={styles.userHeader}>
+            <Text style={styles.userName}>{item.name}</Text>
+            {item.isAvailableToHangout && (
+              <View style={styles.availableBadge}>
+                <View style={styles.availableDot} />
+                <Text style={styles.availableText}>Available</Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.userLocationRow}>
+            <Text style={styles.userFlag}>{item.flag}</Text>
+            <Text style={styles.userLocation}>
+              {item.city}, {item.country}
+            </Text>
+            {item.distance !== undefined && (
+              <Text style={styles.distanceText}>
+                • {LocationService.formatDistance(item.distance)}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.userInfo}>
+            {item.age && item.gender && (
+              <View style={styles.userInfoItem}>
+                <Ionicons name="person-outline" size={14} color="#666" />
+                <Text style={styles.userInfoText}>
+                  {item.gender}, {item.age}
+                </Text>
+              </View>
+            )}
+            <View style={styles.userInfoItem}>
+              <Ionicons name="chatbubble-outline" size={14} color="#666" />
+                <Text style={styles.userInfoText}>
+                  {(item.languages ?? []).map(l => l.name).slice(0, 2).join(', ') || '—'}
+                </Text>
+            </View>
+          </View>
+
+          {item.interests && item.interests.length > 0 && (
+            <View style={styles.interestsRow}>
+              {item.interests.slice(0, 3).map((interest, index) => (
+                <View key={index} style={styles.interestTag}>
+                  <Text style={styles.interestText}>{interest}</Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
         
-        <View style={styles.userLocationRow}>
-          <Text style={styles.userFlag}>{item.flag}</Text>
-          <Text style={styles.userLocation}>
-            {item.city}, {item.country}
-          </Text>
-          {item.distance !== undefined && (
-            <Text style={styles.distanceText}>
-              • {LocationService.formatDistance(item.distance)}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.userInfo}>
-          {item.age && item.gender && (
-            <View style={styles.userInfoItem}>
-              <Ionicons name="person-outline" size={14} color="#666" />
-              <Text style={styles.userInfoText}>
-                {item.gender}, {item.age}
-              </Text>
-            </View>
-          )}
-          <View style={styles.userInfoItem}>
-            <Ionicons name="chatbubble-outline" size={14} color="#666" />
-              <Text style={styles.userInfoText}>
-                {(item.languages ?? []).map(l => l.name).slice(0, 2).join(', ') || '—'}
-              </Text>
-          </View>
-        </View>
-
-        {item.interests && item.interests.length > 0 && (
-          <View style={styles.interestsRow}>
-            {item.interests.slice(0, 3).map((interest, index) => (
-              <View key={index} style={styles.interestTag}>
-                <Text style={styles.interestText}>{interest}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+        {/* Follow Button */}
+        <TouchableOpacity
+          style={[styles.followButton, isFollowing && styles.followingButton]}
+          onPress={(e) => handleFollowToggle(item, e)}
+        >
+          <Ionicons 
+            name={isFollowing ? "checkmark" : "person-add-outline"} 
+            size={18} 
+            color={isFollowing ? "#fff" : "#007AFF"} 
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -493,6 +537,23 @@ const styles = StyleSheet.create({
   interestText: {
     fontSize: 12,
     color: '#666',
+  },
+  followButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followingButton: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   emptyContainer: {
     alignItems: 'center',

@@ -1,10 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Image, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MOCK_CHATS, MOCK_USERS } from '@/src/services/mockData';
-import { Message } from '@/src/types';
+import { Message, User } from '@/src/types';
 import { formatTime } from '@/src/utils/date';
 import WebSocketService from '@/src/services/websocket';
 import ImageService from '@/src/services/image';
@@ -15,118 +26,219 @@ export default function ChatScreen() {
   const params = useLocalSearchParams();
   const chatId = params.id as string;
   const { user: currentUser } = useAuth();
-  
-  const chat = MOCK_CHATS.find(c => c.id === chatId) || MOCK_CHATS[0];
-  const otherUser = chat.participants[0];
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
+  const [userMap, setUserMap] = useState<Record<string, User>>({});
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const flatListRef = useRef<FlatList<Message>>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Người còn lại trong DM (suy ra từ các sender khác currentUser)
+  const otherUser = useMemo<User | undefined>(() => {
+    const others = Object.values(userMap).filter(
+      (u) => u.username && u.username !== currentUser?.username
+    );
+    return others[0];
+  }, [userMap, currentUser?.username]);
+
+  // Tạo một User "đủ field" để thỏa mãn type nếu thiếu dữ liệu
+  const makeFullUser = (partial: Partial<User> & { id?: string; username?: string; name?: string; avatar?: string }): User => {
+    const username = partial.username || partial.id || 'user';
+    return {
+      id: partial.id || username,
+      username: username,
+      name: partial.name || username,
+      email: partial.email || `${username}@example.com`, // bắt buộc theo type
+      avatar: partial.avatar || '',
+      country: partial.country || '',
+      city: partial.city || '',
+      status: partial.status || 'Chilling',
+      languages: partial.languages || [],
+      interests: partial.interests || [],
+      bio: partial.bio,
+      gender: partial.gender,
+      age: partial.age,
+      memberSince: partial.memberSince,
+      followersCount: partial.followersCount,
+      followingCount: partial.followingCount,
+      postsCount: partial.postsCount,
+      specialties: partial.specialties,
+      isAvailableToHangout: partial.isAvailableToHangout,
+      hangoutActivities: partial.hangoutActivities,
+      currentActivity: partial.currentActivity,
+      location: partial.location,
+      isOnline: partial.isOnline,
+      flag: partial.flag,
+    };
+  };
+
+  // Chuẩn hóa 1 message trả về từ API/WS để luôn có sender (ít nhất là placeholder)
+  const normalizeMessage = (raw: any): Message => {
+    const senderUsername: string =
+      raw?.senderId ??
+      raw?.sender_username ??
+      raw?.sender?.username ??
+      raw?.sender ??
+      '';
+
+    const existingUser = senderUsername ? userMap[senderUsername] : undefined;
+
+    // Nếu đã có user chi tiết thì dùng, nếu không tạo user tối thiểu (đủ fields)
+    const sender: User =
+      existingUser ||
+      (raw?.sender
+        ? makeFullUser({
+            id: raw.sender.id,
+            username: raw.sender.username,
+            name: raw.sender.name,
+            avatar: raw.sender.avatar,
+            email: raw.sender.email,
+            country: raw.sender.country,
+            city: raw.sender.city,
+            status: raw.sender.status,
+            languages: raw.sender.languages,
+            interests: raw.sender.interests,
+          })
+        : makeFullUser({ username: senderUsername }));
+
+    const imageUrl: string | undefined =
+      raw?.image ||
+      raw?.message_media?.[0]?.media_url ||
+      undefined;
+
+    return {
+      id: String(raw?.id ?? `${Date.now()}`),
+      chatId: String(raw?.chatId ?? raw?.conversation_id ?? chatId),
+      senderId: String(senderUsername || ''),
+      sender,
+      content: raw?.content ?? '',
+      image: imageUrl,
+      timestamp: raw?.timestamp ?? raw?.created_at ?? new Date().toISOString(),
+      read: Boolean(raw?.read ?? false),
+    };
+  };
+
+  // Enrich: load profile thật cho các sender để có avatar/tên thật
+  const enrichSenders = async (msgs: Message[]) => {
+    try {
+      const usernames = Array.from(
+        new Set(
+          msgs
+            .map((m) => m.senderId)
+            .filter((u): u is string => typeof u === 'string' && u.length > 0)
+        )
+      );
+
+      const fetchers = usernames.map(async (u) => {
+        if (userMap[u]) return [u, userMap[u]] as const;
+        try {
+          const user = await ApiService.getUserByUsername(u);
+          return [u, user] as const;
+        } catch {
+          // fallback nếu không fetch được
+          return [u, makeFullUser({ username: u })] as const;
+        }
+      });
+
+      const results = await Promise.all(fetchers);
+      const newMap: Record<string, User> = { ...userMap };
+      results.forEach(([u, user]) => {
+        newMap[u] = user;
+      });
+
+      setUserMap(newMap);
+
+      // Cập nhật lại messages với sender đầy đủ
+      setMessages((prev) =>
+        prev.map((m) => (newMap[m.senderId] ? { ...m, sender: newMap[m.senderId] } : m))
+      );
+    } catch (e) {
+      console.warn('Failed to enrich sender profiles', e);
+    }
+  };
+
+  // Tải messages thật từ API, chuẩn hóa, rồi enrich
+  const loadMessages = async () => {
+    try {
+      const rawMessages = await ApiService.getChatMessages(chatId);
+      const normalized = (rawMessages as any[]).map((m) => normalizeMessage(m));
+      // Nếu API trả newest first thì đảo để render từ cũ -> mới
+      const ordered = normalized.reverse();
+      setMessages(ordered);
+
+      // Enrich avatars + names
+      enrichSenders(ordered);
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 50);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      setMessages([]);
+    }
+  };
+
+  // WebSocket setup
   useEffect(() => {
-    // Load messages and setup WebSocket
-    loadMessages();
-    setupWebSocket();
+    if (!chatId || !currentUser?.username) return;
+
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+    if (!WebSocketService.isConnected()) {
+      const token = currentUser.username; // TODO: thay bằng token thực nếu có
+      WebSocketService.connect(apiUrl, token);
+      setTimeout(() => {
+        if (WebSocketService.isConnected()) {
+          WebSocketService.joinConversation(chatId);
+        }
+      }, 800);
+    } else {
+      WebSocketService.joinConversation(chatId);
+    }
+
+    const onNewMsg = (incoming: any) => {
+      const msg = normalizeMessage(incoming);
+      if (String(msg.chatId) === String(chatId)) {
+        setMessages((prev) => [...prev, msg]);
+        // Cố gắng enrich sender vừa đến
+        if (msg.senderId && !userMap[msg.senderId]) {
+          enrichSenders([msg]);
+        }
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
+    };
+
+    const onTyping = (data: any) => {
+      if (String(data.conversationId) === String(chatId) && data.username !== currentUser.username) {
+        setOtherUserTyping(Boolean(data.isTyping));
+      }
+    };
+
+    WebSocketService.onNewMessage(onNewMsg);
+    WebSocketService.onTyping(onTyping);
 
     return () => {
-      // Cleanup WebSocket
-      WebSocketService.leaveConversation(chatId);
+      try {
+        WebSocketService.leaveConversation(chatId);
+      } catch {}
       WebSocketService.off('new_message');
       WebSocketService.off('typing');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, currentUser?.username, userMap]);
+
+  // Load messages khi vào màn hình
+  useEffect(() => {
+    if (chatId) {
+      loadMessages();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
-
-  const setupWebSocket = () => {
-    // Connect to WebSocket if not already connected
-    const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-    if (!WebSocketService.isConnected()) {
-      WebSocketService.connect(apiUrl);
-    }
-
-    // Join conversation room
-    WebSocketService.joinConversation(chatId);
-
-    // Listen for new messages
-    WebSocketService.onNewMessage((message: Message) => {
-      if (message.chatId === chatId) {
-        setMessages(prev => [...prev, message]);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      }
-    });
-
-    // Listen for typing indicators
-    WebSocketService.onTyping((data) => {
-      if (data.conversationId === chatId && data.username !== currentUser?.username) {
-        setOtherUserTyping(data.isTyping);
-      }
-    });
-  };
-
-  const loadMessages = async () => {
-    try {
-      // Try to load real messages from API
-      const realMessages = await ApiService.getChatMessages(chatId);
-      setMessages(realMessages);
-    } catch (error) {
-      console.log('Using mock messages', error);
-      // Fall back to mock messages
-      const mockMessages: Message[] = [
-        {
-          id: 'm1',
-          chatId: chat.id,
-          senderId: otherUser.id,
-          sender: otherUser,
-          content: 'Hey! How are you doing?',
-          timestamp: '2025-11-08T09:00:00Z',
-          read: true,
-        },
-        {
-          id: 'm2',
-          chatId: chat.id,
-          senderId: MOCK_USERS[0].id,
-          sender: MOCK_USERS[0],
-          content: "I'm great! How about you?",
-          timestamp: '2025-11-08T09:05:00Z',
-          read: true,
-        },
-        {
-          id: 'm3',
-          chatId: chat.id,
-          senderId: otherUser.id,
-          sender: otherUser,
-          content: 'Doing well! Are you going to the event tonight?',
-          timestamp: '2025-11-08T09:10:00Z',
-          read: true,
-        },
-        {
-          id: 'm4',
-          chatId: chat.id,
-          senderId: MOCK_USERS[0].id,
-          sender: MOCK_USERS[0],
-          content: 'Yes! Looking forward to it. See you there?',
-          timestamp: '2025-11-08T09:15:00Z',
-          read: true,
-        },
-        {
-          id: 'm5',
-          chatId: chat.id,
-          senderId: otherUser.id,
-          sender: otherUser,
-          content: 'Definitely! 😊',
-          timestamp: '2025-11-08T09:20:00Z',
-          read: true,
-        },
-      ];
-      setMessages(mockMessages);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !currentUser?.username) return;
@@ -134,34 +246,38 @@ export default function ChatScreen() {
     const messageContent = inputText;
     setInputText('');
 
-    // Send via WebSocket for real-time delivery
+    // optimistic message dùng currentUser (đã là User đầy đủ)
+    const optimisticMessage: Message = {
+      id: `temp-${Date.now()}`,
+      chatId: String(chatId),
+      senderId: currentUser.username,
+      sender: currentUser,
+      content: messageContent,
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+
     try {
-      WebSocketService.sendMessage(chatId, currentUser.username, messageContent);
-      
-      // Also send via API as backup
-      await ApiService.sendMessage(chatId, currentUser.username, messageContent);
-      
-      // Stop typing indicator
+      const sentViaWs = WebSocketService.isConnected()
+        ? WebSocketService.sendMessage(chatId, currentUser.username, messageContent)
+        : false;
+
+      if (!sentViaWs) {
+        await ApiService.sendMessage(chatId, currentUser.username, messageContent);
+      }
+
       handleTyping(false);
     } catch (error) {
       console.error('Error sending message:', error);
-      // Add message locally if API fails
-      const newMessage: Message = {
-        id: `m${Date.now()}`,
-        chatId: chat.id,
-        senderId: currentUser.id,
-        sender: currentUser,
-        content: messageContent,
-        timestamp: new Date().toISOString(),
-        read: false,
-      };
-      setMessages(prev => [...prev, newMessage]);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id));
     }
-
-    // Scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
   const handleImagePick = async () => {
@@ -173,7 +289,6 @@ export default function ChatScreen() {
 
       if (!image) return;
 
-      // Validate image size (max 5MB)
       if (!ImageService.validateImageSize(image, 5)) {
         Alert.alert('Error', 'Image size must be less than 5MB');
         return;
@@ -181,14 +296,12 @@ export default function ChatScreen() {
 
       setUploading(true);
 
-      // Create file object for upload
       const imageFile: any = {
         uri: image.uri,
         type: image.type,
         name: image.name,
       };
 
-      // Send message with image
       if (currentUser?.username) {
         await ApiService.sendMessageWithImage(
           chatId,
@@ -211,18 +324,19 @@ export default function ChatScreen() {
     if (!currentUser?.username) return;
 
     setIsTyping(typing);
-    WebSocketService.sendTyping(chatId, currentUser.username, typing);
 
-    // Clear previous timeout
+    if (WebSocketService.isConnected()) {
+      WebSocketService.sendTyping(chatId, currentUser.username, typing);
+    }
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
 
-    // Stop typing after 3 seconds of inactivity
     if (typing) {
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        if (currentUser?.username) {
+        if (currentUser?.username && WebSocketService.isConnected()) {
           WebSocketService.sendTyping(chatId, currentUser.username, false);
         }
       }, 3000);
@@ -231,8 +345,7 @@ export default function ChatScreen() {
 
   const handleTextChange = (text: string) => {
     setInputText(text);
-    
-    // Start typing indicator
+
     if (text.length > 0 && !isTyping) {
       handleTyping(true);
     } else if (text.length === 0 && isTyping) {
@@ -245,16 +358,25 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isOwnMessage = item.senderId === (currentUser?.id || MOCK_USERS[0].id);
-    
+    const isOwnMessage = item.senderId === (currentUser?.username || '');
+
+    const senderAvatar = item.sender?.avatar || '';
+    const senderName = item.sender?.name || item.senderId;
+
     return (
       <View style={[styles.messageContainer, isOwnMessage && styles.ownMessageContainer]}>
         {!isOwnMessage && (
-          <Image source={{ uri: item.sender.avatar }} style={styles.messageAvatar} />
+          senderAvatar.length > 0 ? (
+            <Image source={{ uri: senderAvatar }} style={styles.messageAvatar} />
+          ) : (
+            <View style={[styles.messageAvatar, styles.messageAvatarPlaceholder]}>
+              <Ionicons name="person-circle-outline" size={28} color="#999" />
+            </View>
+          )
         )}
         <View style={[styles.messageBubble, isOwnMessage && styles.ownMessageBubble]}>
           {!isOwnMessage && (
-            <Text style={styles.senderName}>{item.sender.name}</Text>
+            <Text style={styles.senderName}>{senderName}</Text>
           )}
           {item.image && (
             <Image source={{ uri: item.image }} style={styles.messageImage} />
@@ -283,7 +405,7 @@ export default function ChatScreen() {
     <>
       <Stack.Screen
         options={{
-          title: chat.name || otherUser.name,
+          title: otherUser?.name || 'Conversation',
           headerRight: () => (
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.headerButton}>
@@ -305,7 +427,6 @@ export default function ChatScreen() {
           style={styles.keyboardView}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {/* Messages List */}
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -313,9 +434,9 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 0)}
           />
 
-          {/* Quick Messages Panel */}
           {showQuickMessages && (
             <View style={styles.quickMessagesPanel}>
               <View style={styles.quickMessagesPanelHeader}>
@@ -342,16 +463,15 @@ export default function ChatScreen() {
             </View>
           )}
 
-          {/* Input Area */}
           <View style={styles.inputContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.inputIconButton}
               onPress={() => setShowQuickMessages(!showQuickMessages)}
             >
               <Ionicons name="flash-outline" size={24} color="#666" />
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.inputIconButton}
               onPress={handleImagePick}
               disabled={uploading}
@@ -382,10 +502,9 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Typing Indicator */}
           {otherUserTyping && (
             <View style={styles.typingIndicator}>
-              <Text style={styles.typingText}>{otherUser.name} is typing...</Text>
+              <Text style={styles.typingText}>{otherUser?.name || 'Someone'} is typing...</Text>
             </View>
           )}
         </KeyboardAvoidingView>
@@ -426,6 +545,12 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     marginRight: 8,
+    overflow: 'hidden',
+  },
+  messageAvatarPlaceholder: {
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   messageBubble: {
     maxWidth: '75%',
