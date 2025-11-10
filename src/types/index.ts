@@ -94,9 +94,9 @@ export interface HangoutActivity {
 // Chat related types
 export interface Chat {
   id: string;
-  type: 'event' | 'user' | 'group';
+  type: 'event' | 'user' | 'group'|'dm';
   name?: string;
-  participants: User[];
+  participants?: User[];
   lastMessage?: Message;
   unreadCount?: number;
   eventId?: string;

@@ -25,6 +25,8 @@ export default function InboxScreen() {
       setChats(data);
     } catch (error) {
       console.error('Error loading chats:', error);
+      // Don't show alert on every failed load, just log it
+      // The user can refresh manually if needed
     } finally {
       setLoading(false);
     }
@@ -48,21 +50,45 @@ export default function InboxScreen() {
   });
 
   const renderChatItem = ({ item }: { item: Chat }) => {
-    const otherUser = item.participants[0]; // Simplified - would need to filter out current user
+    const isDM = item.type === 'dm' || item.type === 'user';
+    const otherUser = isDM
+      ? item.participants?.find(p => p.username !== user?.username)
+      : undefined;
+
+    const fallbackUser = item.lastMessage?.sender;
+
+    const displayName = isDM
+      ? (otherUser?.name || fallbackUser?.name || otherUser?.username || fallbackUser?.username || 'Direct Message')
+      : (item.name || 'Group');
+
+    const avatarUrl = isDM
+      ? (otherUser?.avatar || fallbackUser?.avatar)
+      : undefined;
+
+    const relativeTime = item.lastMessage?.timestamp
+      ? getRelativeTime(item.lastMessage.timestamp)
+      : '';
+
     const isUnread = (item.unreadCount ?? 0) > 0;
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.chatItem}
         onPress={() => router.push(`/chat?id=${item.id}`)}
       >
         <View style={styles.avatarContainer}>
-          {item.type === 'event' ? (
-            <View style={styles.eventAvatarPlaceholder}>
-              <Ionicons name="calendar" size={24} color="#007AFF" />
-            </View>
+          {isDM ? (
+            avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.chatAvatar} />
+            ) : (
+              <View style={styles.eventAvatarPlaceholder}>
+                <Ionicons name="person-circle-outline" size={32} color="#999" />
+              </View>
+            )
           ) : (
-            <Image source={{ uri: otherUser.avatar }} style={styles.chatAvatar} />
+            <View style={styles.eventAvatarPlaceholder}>
+              <Ionicons name="people-outline" size={24} color="#007AFF" />
+            </View>
           )}
           {isUnread && <View style={styles.unreadDot} />}
         </View>
@@ -70,17 +96,14 @@ export default function InboxScreen() {
         <View style={styles.chatContent}>
           <View style={styles.chatHeader}>
             <Text style={[styles.chatName, isUnread && styles.unreadText]}>
-              {item.name || otherUser.name}
+              {displayName}
             </Text>
-            {item.lastMessage && (
-              <Text style={styles.chatTime}>
-                {getRelativeTime(item.lastMessage.timestamp)}
-              </Text>
+            {!!relativeTime && (
+              <Text style={styles.chatTime}>{relativeTime}</Text>
             )}
           </View>
-
           <View style={styles.messageRow}>
-            {item.lastMessage && (
+            {item.lastMessage?.content && (
               <Text
                 style={[styles.lastMessage, isUnread && styles.unreadText]}
                 numberOfLines={1}

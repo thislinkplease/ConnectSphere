@@ -6,34 +6,43 @@ class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private isConnecting = false;
 
   connect(url: string, token?: string) {
-    if (this.socket?.connected) {
+    if (this.socket?.connected || this.isConnecting) {
+      console.log('WebSocket already connected or connecting');
       return;
     }
+
+    console.log('Connecting to WebSocket:', url);
+    this.isConnecting = true;
 
     this.socket = io(url, {
       auth: {
         token,
       },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: this.reconnectDelay,
+      timeout: 10000,
     });
 
     this.socket.on('connect', () => {
-      console.log('WebSocket connected');
+      console.log('WebSocket connected successfully');
       this.reconnectAttempts = 0;
+      this.isConnecting = false;
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('WebSocket disconnected:', reason);
+      this.isConnecting = false;
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
+      console.error('WebSocket connection error:', error.message);
       this.reconnectAttempts++;
+      this.isConnecting = false;
       
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('Max reconnection attempts reached');
@@ -44,9 +53,12 @@ class WebSocketService {
 
   disconnect() {
     if (this.socket) {
+      console.log('Disconnecting WebSocket');
       this.socket.disconnect();
       this.socket = null;
     }
+    this.isConnecting = false;
+    this.reconnectAttempts = 0;
   }
 
   // Join a conversation room
@@ -65,13 +77,17 @@ class WebSocketService {
 
   // Send a message
   sendMessage(conversationId: string, senderUsername: string, content: string, replyToMessageId?: string) {
-    if (this.socket) {
+    if (this.socket?.connected) {
       this.socket.emit('send_message', {
         conversationId,
         senderUsername,
         content,
         replyToMessageId,
       });
+      return true;
+    } else {
+      console.warn('WebSocket not connected, cannot send message');
+      return false;
     }
   }
 

@@ -11,6 +11,7 @@ export default function AccountScreen() {
   const { user, logout } = useAuth();
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const loadProfileCompletion = async () => {
@@ -164,9 +165,30 @@ export default function AccountScreen() {
         </View>
 
         {/* Sign Out */}
-        <TouchableOpacity style={styles.signOutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <TouchableOpacity 
+          style={styles.signOutButton} 
+          onPress={async () => {
+            setLoggingOut(true);
+            try {
+              await logout();
+              router.replace('/login');
+            } catch (error) {
+              console.error('Error logging out:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            } finally {
+              setLoggingOut(false);
+            }
+          }}
+          disabled={loggingOut}
+        >
+          {loggingOut ? (
+            <ActivityIndicator size="small" color="#FF3B30" />
+          ) : (
+            <>
+              <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <View style={styles.footer} />

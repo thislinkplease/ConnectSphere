@@ -116,23 +116,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await ApiService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Disconnect WebSocket
+      // Disconnect WebSocket immediately
       WebSocketService.disconnect();
       
-      // Clear stored auth data
+      // Clear stored auth data immediately
       await AsyncStorage.removeItem(TOKEN_KEY);
       await AsyncStorage.removeItem(USER_KEY);
       
+      // Clear auth token
       ApiService.removeAuthToken();
+      
+      // Update state immediately
       setAuthState({
         isAuthenticated: false,
         user: null,
         token: null,
       });
+      
+      // Call logout API in background (don't wait for it)
+      ApiService.logout().catch(error => {
+        console.error('Logout API error:', error);
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
