@@ -4,8 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Community } from '@/src/types';
 import ApiService from '@/src/services/api';
+import { useTheme } from '@/src/context/ThemeContext';
 
 export default function DiscussionScreen() {
+  const { colors } = useTheme();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,12 +69,12 @@ export default function DiscussionScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={styles.headerTitle}>Discussion</Text>
       </View>
 
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
@@ -83,16 +85,16 @@ export default function DiscussionScreen() {
         />
       </View>
 
-      <TouchableOpacity style={styles.uploadButton}>
-        <Ionicons name="add-circle-outline" size={24} color="#007AFF" />
-        <Text style={styles.uploadButtonText}>Upload to Communities</Text>
+      <TouchableOpacity style={[styles.uploadButton, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+        <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+        <Text style={[styles.uploadButtonText, { color: colors.primary }]}>Upload to Communities</Text>
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>Suggested Communities</Text>
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -118,13 +120,10 @@ export default function DiscussionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
-    backgroundColor: '#fff',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
     fontSize: 24,
@@ -132,13 +131,11 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   searchContainer: {
-    backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   searchIcon: {
     marginRight: 8,
@@ -149,7 +146,6 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   uploadButton: {
-    backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -158,11 +154,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#007AFF',
   },
   uploadButtonText: {
     fontSize: 16,
-    color: '#007AFF',
     fontWeight: '600',
     marginLeft: 8,
   },

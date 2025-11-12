@@ -179,6 +179,16 @@ export default function EditProfileScreen() {
     setLoading(true);
 
     try {
+      // Fetch the latest user data to get the correct ID
+      const freshUser = currentUser?.username 
+        ? await ApiService.getUserByUsername(currentUser.username)
+        : null;
+
+      if (!freshUser?.id) {
+        Alert.alert('Error', 'Unable to update profile. Please try logging in again.');
+        return;
+      }
+
       const updatedUser: Partial<User> = {
         name,
         bio,
@@ -193,21 +203,39 @@ export default function EditProfileScreen() {
         age: age ? parseInt(age) : undefined,
       };
 
-      if (currentUser?.id) {
-        const result = await ApiService.updateUser(currentUser.id, updatedUser);
-        
-        // Update auth context
-        if (updateAuthUser) {
-          updateAuthUser(result);
-        }
-
-        Alert.alert('Success', 'Profile updated successfully!', [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
+      const result = await ApiService.updateUser(freshUser.id, updatedUser);
+      
+      // Update auth context
+      if (updateAuthUser) {
+        updateAuthUser(result);
       }
-    } catch (error) {
+
+      Alert.alert('Success', 'Profile updated successfully!', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      
+      // Handle specific error cases
+      if (error?.response?.status === 500) {
+        Alert.alert(
+          'Error', 
+          'Unable to update profile. Your session may have expired. Please try logging in again.',
+          [
+            { text: 'OK', style: 'cancel' }
+          ]
+        );
+      } else if (error?.response?.status === 404) {
+        Alert.alert(
+          'Error', 
+          'User not found. Please try logging in again.',
+          [
+            { text: 'OK', style: 'cancel' }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to update profile. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

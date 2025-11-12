@@ -9,6 +9,7 @@ interface AuthContextType extends AuthState {
   signup: (username: string, name: string, email: string, password: string, country: string, city: string, gender?: 'Male' | 'Female' | 'Other') => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -43,6 +44,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
         WebSocketService.connect(apiUrl, token);
         
+        // Check Pro status from server
+        try {
+          if (user.username) {
+            const proStatus = await ApiService.getProStatus(user.username);
+            user.isPro = proStatus.isPro;
+            // Update stored user with Pro status
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+          }
+        } catch (proError) {
+          console.error('Error loading pro status:', proError);
+          // Continue with stored isPro value
+        }
+        
         setAuthState({
           isAuthenticated: true,
           user,
@@ -59,6 +73,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       const { user, token } = await ApiService.login({ email, password });
+      
+      // Check Pro status from server
+      try {
+        if (user.username) {
+          const proStatus = await ApiService.getProStatus(user.username);
+          user.isPro = proStatus.isPro;
+        }
+      } catch (proError) {
+        console.error('Error loading pro status:', proError);
+        // Continue without Pro status
+      }
       
       // Store auth data
       await AsyncStorage.setItem(TOKEN_KEY, token);
@@ -92,6 +117,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         city,
         gender,
       });
+      
+      // Check Pro status from server (new users typically won't be Pro, but check anyway)
+      try {
+        if (user.username) {
+          const proStatus = await ApiService.getProStatus(user.username);
+          user.isPro = proStatus.isPro;
+        }
+      } catch (proError) {
+        console.error('Error loading pro status:', proError);
+        // Continue without Pro status
+      }
       
       // Store auth data
       await AsyncStorage.setItem(TOKEN_KEY, token);
@@ -143,10 +179,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateUser = async (data: Partial<User>) => {
-    if (!authState.user) return;
+    if (!authState.user?.username) return;
 
     try {
-      const updatedUser = await ApiService.updateUser(authState.user.id, data);
+      // Use the user ID from the current authState if available
+      // If not, fetch the latest user data to get the correct ID
+      let userId = authState.user.id;
+      
+      // Only fetch fresh user if we don't have an ID
+      if (!userId) {
+        const freshUser = await ApiService.getUserByUsername(authState.user.username);
+        userId = freshUser.id;
+      }
+      
+      // Update using the user ID
+      const updatedUser = await ApiService.updateUser(userId, data);
       
       // Update stored user
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
@@ -161,6 +208,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshUser = async () => {
+    if (!authState.user?.username) return;
+
+    try {
+      // Fetch fresh user data from server
+      const freshUser = await ApiService.getUserByUsername(authState.user.username);
+      
+      // Update stored user
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(freshUser));
+      
+      setAuthState(prev => ({
+        ...prev,
+        user: freshUser,
+      }));
+    } catch (error) {
+      console.error('Refresh user error:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -169,6 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signup,
         logout,
         updateUser,
+        refreshUser,
         isLoading,
       }}
     >

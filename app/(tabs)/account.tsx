@@ -1,33 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 import { useRouter } from 'expo-router';
 import ApiService from '@/src/services/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user: authUser, logout, refreshUser } = useAuth();
+  const { colors } = useTheme();
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  useEffect(() => {
-    const loadProfileCompletion = async () => {
-      if (!user?.username) return;
-      try {
-        const data = await ApiService.getProfileCompletion(user.username);
-        setProfileCompletion(data.completion_percentage || 0);
-      } catch (error) {
-        console.error('Error loading profile completion:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadProfileData = useCallback(async () => {
+    if (!authUser?.username) return;
+    try {
+      // Load profile completion
+      const completionData = await ApiService.getProfileCompletion(authUser.username);
+      setProfileCompletion(completionData.completion_percentage || 0);
 
-    loadProfileCompletion();
-  }, [user?.username]);
+      // Refresh user data from server (this fetches the latest data without updating)
+      try {
+        await refreshUser();
+      } catch (userError) {
+        console.error('Error loading user data:', userError);
+      }
+    } catch (error) {
+      console.error('Error loading profile completion:', error);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?.username]); // Removed refreshUser from dependencies to prevent infinite loop
+
+  // Load data only on initial mount
+  useEffect(() => {
+    loadProfileData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array to run only once on mount
+
+  // Reload data when returning to this tab
+  useFocusEffect(
+    useCallback(() => {
+      // Only reload if the tab is focused (screen is active)
+      loadProfileData();
+      return () => {}; // Cleanup function
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authUser?.username]) // Only depend on username, not the whole function
+  );
+
+  // Use the user from auth context which will be updated
+  const user = authUser;
 
   if (!user) {
     return (
@@ -52,8 +79,43 @@ export default function AccountScreen() {
     </TouchableOpacity>
   );
 
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+      backgroundColor: colors.background,
+    },
+    statusBadge: {
+      ...styles.statusBadge,
+      backgroundColor: colors.primary + '20',
+    },
+    statusText: {
+      ...styles.statusText,
+      color: colors.primary,
+    },
+    editProfileButton: {
+      ...styles.editProfileButton,
+      borderColor: colors.primary,
+    },
+    editProfileText: {
+      ...styles.editProfileText,
+      color: colors.primary,
+    },
+    progressBar: {
+      ...styles.progressBar,
+      backgroundColor: colors.primary,
+    },
+    interestTag: {
+      ...styles.interestTag,
+      backgroundColor: colors.primary + '20',
+    },
+    interestText: {
+      ...styles.interestText,
+      color: colors.primary,
+    },
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={dynamicStyles.container}>
       <ScrollView>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -64,7 +126,15 @@ export default function AccountScreen() {
               <Ionicons name="person" size={60} color="#999" />
             </View>
           )}
-          <Text style={styles.profileName}>{user.name}</Text>
+          <View style={styles.nameContainer}>
+            <Text style={styles.profileName}>{user.name}</Text>
+            {user.isPro && (
+              <View style={styles.proBadge}>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.proText}>PRO</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.locationRow}>
             <Text style={styles.flag}>{user.flag || '🌍'}</Text>
             <Text style={styles.location}>
@@ -72,16 +142,16 @@ export default function AccountScreen() {
             </Text>
           </View>
           
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{user.status}</Text>
+          <View style={dynamicStyles.statusBadge}>
+            <Text style={dynamicStyles.statusText}>{user.status}</Text>
           </View>
 
           <TouchableOpacity 
-            style={styles.editProfileButton}
+            style={dynamicStyles.editProfileButton}
             onPress={() => router.push('/edit-profile')}
           >
-            <Ionicons name="create-outline" size={20} color="#007AFF" />
-            <Text style={styles.editProfileText}>Edit Profile</Text>
+            <Ionicons name="create-outline" size={20} color={colors.primary} />
+            <Text style={dynamicStyles.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
 
@@ -91,11 +161,11 @@ export default function AccountScreen() {
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>Your Profile: {profileCompletion}% completed</Text>
               <TouchableOpacity>
-                <Ionicons name="chevron-forward" size={20} color="#007AFF" />
+                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${profileCompletion}%` }]} />
+              <View style={[dynamicStyles.progressBar, { width: `${profileCompletion}%` }]} />
             </View>
             <Text style={styles.progressHint}>Complete your profile to get more connections</Text>
           </View>
@@ -126,14 +196,20 @@ export default function AccountScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Summary</Text>
           <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
+            <TouchableOpacity 
+              style={styles.summaryItem}
+              onPress={() => router.push(`/followers-list?username=${user.username}&type=followers`)}
+            >
               <Text style={styles.summaryValue}>{user.followersCount || 0}</Text>
               <Text style={styles.summaryLabel}>Followers</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{user.gender || 'N/A'}</Text>
-              <Text style={styles.summaryLabel}>Gender</Text>
-            </View>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.summaryItem}
+              onPress={() => router.push(`/followers-list?username=${user.username}&type=following`)}
+            >
+              <Text style={styles.summaryValue}>{user.followingCount || 0}</Text>
+              <Text style={styles.summaryLabel}>Following</Text>
+            </TouchableOpacity>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryValue}>{user.age || 'N/A'}</Text>
               <Text style={styles.summaryLabel}>Age</Text>
@@ -147,8 +223,8 @@ export default function AccountScreen() {
             <Text style={styles.sectionTitle}>Interests</Text>
             <View style={styles.interestsContainer}>
               {user.interests.map((interest, index) => (
-                <View key={index} style={styles.interestTag}>
-                  <Text style={styles.interestText}>{interest}</Text>
+                <View key={index} style={dynamicStyles.interestTag}>
+                  <Text style={dynamicStyles.interestText}>{interest}</Text>
                 </View>
               ))}
             </View>
@@ -160,8 +236,8 @@ export default function AccountScreen() {
           <Text style={styles.sectionTitle}>Settings</Text>
           {renderInfoRow('notifications-outline', 'Notifications', '', () => router.push('/settings'))}
           {renderInfoRow('settings-outline', 'Manage Account', '', () => router.push('/settings'))}
-          {renderInfoRow('card-outline', 'Payment & Pro Features', '', () => Alert.alert('Coming Soon', 'Payment features will be available soon.'))}
-          {renderInfoRow('information-circle-outline', 'About', '', () => Alert.alert('ConnectSphere', 'Version 1.0.0\n\nA social networking app to connect with people around the world.'))}
+          {renderInfoRow('card-outline', 'Payment & Pro Features', '', () => router.push('/payment-pro'))}
+          {renderInfoRow('information-circle-outline', 'About', '', () => Alert.alert('Flat Sphere', 'Version 1.0.0\n\nA social networking app to connect with people around the world.'))}
         </View>
 
         {/* Sign Out */}
@@ -226,6 +302,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 6,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  proText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFD700',
   },
   locationRow: {
     flexDirection: 'row',

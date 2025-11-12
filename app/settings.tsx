@@ -4,10 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { logout } = useAuth();
+  const { colors } = useTheme();
 
   // Settings state
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -92,7 +94,7 @@ export default function SettingsScreen() {
           <Switch
             value={value}
             onValueChange={onValueChange}
-            trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
+            trackColor={{ false: '#e0e0e0', true: colors.primary }}
             thumbColor="#fff"
           />
         )}
@@ -110,10 +112,10 @@ export default function SettingsScreen() {
           title: 'Settings',
         }}
       />
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView>
           {/* Account Settings */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={styles.sectionTitle}>Account</Text>
             <SettingRow
               icon="person-outline"
@@ -136,7 +138,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* Notification Settings */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={styles.sectionTitle}>Notifications</Text>
             <SettingRow
               icon="notifications-outline"
@@ -176,7 +178,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* Privacy Settings */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={styles.sectionTitle}>Privacy</Text>
             <SettingRow
               icon="eye-outline"
@@ -202,7 +204,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* App Settings */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={styles.sectionTitle}>App Settings</Text>
             <SettingRow
               icon="language-outline"
@@ -225,7 +227,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* About */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={styles.sectionTitle}>About</Text>
             <SettingRow
               icon="information-circle-outline"
@@ -254,7 +256,7 @@ export default function SettingsScreen() {
           </View>
 
           {/* Danger Zone */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
             <Text style={styles.sectionTitle}>Danger Zone</Text>
             <SettingRow
               icon="log-out-outline"
@@ -273,7 +275,7 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>ConnectSphere v1.0.0</Text>
+            <Text style={styles.footerText}>Flat Sphere v1.0.0</Text>
             <Text style={styles.footerSubtext}>&hearts; Made with 3 chị em cute đáng yêu &hearts;</Text>
           </View>
         </ScrollView>
@@ -285,10 +287,10 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    
   },
   section: {
-    backgroundColor: '#fff',
+    
     marginTop: 8,
     paddingVertical: 8,
   },

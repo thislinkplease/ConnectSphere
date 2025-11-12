@@ -21,11 +21,13 @@ import WebSocketService from '@/src/services/websocket';
 import ImageService from '@/src/services/image';
 import ApiService from '@/src/services/api';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
   const chatId = params.id as string;
   const { user: currentUser } = useAuth();
+  const { colors, isPro } = useTheme();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [userMap, setUserMap] = useState<Record<string, User>>({});
@@ -33,6 +35,8 @@ export default function ChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showQuickMessages, setShowQuickMessages] = useState(false);
+
   const flatListRef = useRef<FlatList<Message>>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,14 +48,16 @@ export default function ChatScreen() {
     return others[0];
   }, [userMap, currentUser?.username]);
 
-  // Tạo một User "đủ field" để thỏa mãn type nếu thiếu dữ liệu
-  const makeFullUser = (partial: Partial<User> & { id?: string; username?: string; name?: string; avatar?: string }): User => {
+  // Tạo một User "đủ field"
+  const makeFullUser = (
+    partial: Partial<User> & { id?: string; username?: string; name?: string; avatar?: string }
+  ): User => {
     const username = partial.username || partial.id || 'user';
     return {
       id: partial.id || username,
       username: username,
       name: partial.name || username,
-      email: partial.email || `${username}@example.com`, // bắt buộc theo type
+      email: partial.email || `${username}@example.com`,
       avatar: partial.avatar || '',
       country: partial.country || '',
       city: partial.city || '',
@@ -75,7 +81,7 @@ export default function ChatScreen() {
     };
   };
 
-  // Chuẩn hóa 1 message trả về từ API/WS để luôn có sender (ít nhất là placeholder)
+  // Chuẩn hóa message
   const normalizeMessage = (raw: any): Message => {
     const senderUsername: string =
       raw?.senderId ??
@@ -86,7 +92,6 @@ export default function ChatScreen() {
 
     const existingUser = senderUsername ? userMap[senderUsername] : undefined;
 
-    // Nếu đã có user chi tiết thì dùng, nếu không tạo user tối thiểu (đủ fields)
     const sender: User =
       existingUser ||
       (raw?.sender
@@ -105,9 +110,7 @@ export default function ChatScreen() {
         : makeFullUser({ username: senderUsername }));
 
     const imageUrl: string | undefined =
-      raw?.image ||
-      raw?.message_media?.[0]?.media_url ||
-      undefined;
+      raw?.image || raw?.message_media?.[0]?.media_url || undefined;
 
     return {
       id: String(raw?.id ?? `${Date.now()}`),
@@ -121,7 +124,7 @@ export default function ChatScreen() {
     };
   };
 
-  // Enrich: load profile thật cho các sender để có avatar/tên thật
+  // Enrich sender profiles
   const enrichSenders = async (msgs: Message[]) => {
     try {
       const usernames = Array.from(
@@ -138,7 +141,6 @@ export default function ChatScreen() {
           const user = await ApiService.getUserByUsername(u);
           return [u, user] as const;
         } catch {
-          // fallback nếu không fetch được
           return [u, makeFullUser({ username: u })] as const;
         }
       });
@@ -150,8 +152,6 @@ export default function ChatScreen() {
       });
 
       setUserMap(newMap);
-
-      // Cập nhật lại messages với sender đầy đủ
       setMessages((prev) =>
         prev.map((m) => (newMap[m.senderId] ? { ...m, sender: newMap[m.senderId] } : m))
       );
@@ -160,18 +160,14 @@ export default function ChatScreen() {
     }
   };
 
-  // Tải messages thật từ API, chuẩn hóa, rồi enrich
+  // Load messages
   const loadMessages = async () => {
     try {
       const rawMessages = await ApiService.getChatMessages(chatId);
       const normalized = (rawMessages as any[]).map((m) => normalizeMessage(m));
-      // Nếu API trả newest first thì đảo để render từ cũ -> mới
       const ordered = normalized.reverse();
       setMessages(ordered);
-
-      // Enrich avatars + names
       enrichSenders(ordered);
-
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: false });
       }, 50);
@@ -184,11 +180,10 @@ export default function ChatScreen() {
   // WebSocket setup
   useEffect(() => {
     if (!chatId || !currentUser?.username) return;
-
     const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
     if (!WebSocketService.isConnected()) {
-      const token = currentUser.username; // TODO: thay bằng token thực nếu có
+      const token = currentUser.username;
       WebSocketService.connect(apiUrl, token);
       setTimeout(() => {
         if (WebSocketService.isConnected()) {
@@ -202,8 +197,28 @@ export default function ChatScreen() {
     const onNewMsg = (incoming: any) => {
       const msg = normalizeMessage(incoming);
       if (String(msg.chatId) === String(chatId)) {
-        setMessages((prev) => [...prev, msg]);
-        // Cố gắng enrich sender vừa đến
+        setMessages((prev) => {
+          const exists = prev.some(
+            (m) =>
+              m.id === msg.id ||
+              (m.content === msg.content &&
+                m.senderId === msg.senderId &&
+                Math.abs(
+                  new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()
+                ) < 5000)
+          );
+          if (exists) {
+            return prev.map((m) =>
+              m.id.startsWith('temp-') &&
+              m.content === msg.content &&
+              m.senderId === msg.senderId
+                ? msg
+                : m
+            );
+          }
+          return [...prev, msg];
+        });
+
         if (msg.senderId && !userMap[msg.senderId]) {
           enrichSenders([msg]);
         }
@@ -214,7 +229,10 @@ export default function ChatScreen() {
     };
 
     const onTyping = (data: any) => {
-      if (String(data.conversationId) === String(chatId) && data.username !== currentUser.username) {
+      if (
+        String(data.conversationId) === String(chatId) &&
+        data.username !== currentUser.username
+      ) {
         setOtherUserTyping(Boolean(data.isTyping));
       }
     };
@@ -226,13 +244,13 @@ export default function ChatScreen() {
       try {
         WebSocketService.leaveConversation(chatId);
       } catch {}
-      WebSocketService.off('new_message');
-      WebSocketService.off('typing');
+      WebSocketService.off('new_message', onNewMsg);
+      WebSocketService.off('typing', onTyping);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId, currentUser?.username, userMap]);
+  }, [chatId, currentUser?.username]);
 
-  // Load messages khi vào màn hình
+  // Load messages khi vào
   useEffect(() => {
     if (chatId) {
       loadMessages();
@@ -242,11 +260,9 @@ export default function ChatScreen() {
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !currentUser?.username) return;
-
     const messageContent = inputText;
     setInputText('');
 
-    // optimistic message dùng currentUser (đã là User đầy đủ)
     const optimisticMessage: Message = {
       id: `temp-${Date.now()}`,
       chatId: String(chatId),
@@ -258,7 +274,6 @@ export default function ChatScreen() {
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
-
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 80);
@@ -286,7 +301,6 @@ export default function ChatScreen() {
         allowsEditing: true,
         quality: 0.8,
       });
-
       if (!image) return;
 
       if (!ImageService.validateImageSize(image, 5)) {
@@ -306,7 +320,7 @@ export default function ChatScreen() {
         await ApiService.sendMessageWithImage(
           chatId,
           currentUser.username,
-          inputText || '📷 Photo',
+            inputText || '📷 Photo',
           imageFile
         );
         setInputText('');
@@ -322,7 +336,6 @@ export default function ChatScreen() {
 
   const handleTyping = (typing: boolean) => {
     if (!currentUser?.username) return;
-
     setIsTyping(typing);
 
     if (WebSocketService.isConnected()) {
@@ -345,7 +358,6 @@ export default function ChatScreen() {
 
   const handleTextChange = (text: string) => {
     setInputText(text);
-
     if (text.length > 0 && !isTyping) {
       handleTyping(true);
     } else if (text.length === 0 && isTyping) {
@@ -357,41 +369,6 @@ export default function ChatScreen() {
     setInputText(message);
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isOwnMessage = item.senderId === (currentUser?.username || '');
-
-    const senderAvatar = item.sender?.avatar || '';
-    const senderName = item.sender?.name || item.senderId;
-
-    return (
-      <View style={[styles.messageContainer, isOwnMessage && styles.ownMessageContainer]}>
-        {!isOwnMessage && (
-          senderAvatar.length > 0 ? (
-            <Image source={{ uri: senderAvatar }} style={styles.messageAvatar} />
-          ) : (
-            <View style={[styles.messageAvatar, styles.messageAvatarPlaceholder]}>
-              <Ionicons name="person-circle-outline" size={28} color="#999" />
-            </View>
-          )
-        )}
-        <View style={[styles.messageBubble, isOwnMessage && styles.ownMessageBubble]}>
-          {!isOwnMessage && (
-            <Text style={styles.senderName}>{senderName}</Text>
-          )}
-          {item.image && (
-            <Image source={{ uri: item.image }} style={styles.messageImage} />
-          )}
-          <Text style={[styles.messageText, isOwnMessage && styles.ownMessageText]}>
-            {item.content}
-          </Text>
-          <Text style={[styles.messageTime, isOwnMessage && styles.ownMessageTime]}>
-            {formatTime(item.timestamp)}
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
   const quickMessages = [
     { shortcut: '/x', message: 'Xin chào' },
     { shortcut: '/h', message: 'Hello!' },
@@ -399,7 +376,85 @@ export default function ChatScreen() {
     { shortcut: '/s', message: 'See you soon!' },
   ];
 
-  const [showQuickMessages, setShowQuickMessages] = useState(false);
+  // Render từng message
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isOwnMessage = item.senderId === (currentUser?.username || '');
+    const senderAvatar = item.sender?.avatar || '';
+    const senderName = item.sender?.name || item.senderId;
+
+    return (
+      <View
+        style={[
+          styles.messageContainer,
+          isOwnMessage && styles.ownMessageContainer,
+        ]}
+      >
+        {!isOwnMessage && (
+          senderAvatar.length > 0 ? (
+            <Image source={{ uri: senderAvatar }} style={styles.messageAvatar} />
+          ) : (
+            <View
+              style={[
+                styles.messageAvatar,
+                styles.messageAvatarPlaceholder,
+                { backgroundColor: colors.border },
+              ]}
+            >
+              <Ionicons name="person-circle-outline" size={28} color="#999" />
+            </View>
+          )
+        )}
+
+        <View
+          style={[
+            styles.messageBubble,
+            {
+              backgroundColor: isOwnMessage ? colors.primary : colors.card,
+              borderWidth: 1,
+              borderColor: isOwnMessage ? colors.primary : colors.border,
+              shadowColor: '#000',
+            },
+            isOwnMessage && { alignSelf: 'flex-end' },
+          ]}
+        >
+          {!isOwnMessage && (
+            <Text style={[styles.senderName, { color: colors.text }]}>
+              {senderName}
+            </Text>
+          )}
+          {item.image && (
+            <Image
+              source={{ uri: item.image }}
+              style={[
+                styles.messageImage,
+                { borderColor: colors.border },
+              ]}
+            />
+          )}
+            <Text
+              style={[
+              styles.messageText,
+              {
+                color: isOwnMessage ? '#fff' : colors.text,
+              },
+            ]}
+          >
+            {item.content}
+          </Text>
+          <Text
+            style={[
+              styles.messageTime,
+              {
+                color: isOwnMessage ? 'rgba(255,255,255,0.7)' : '#666',
+              },
+            ]}
+          >
+            {formatTime(item.timestamp)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <>
@@ -408,20 +463,21 @@ export default function ChatScreen() {
           title: otherUser?.name || 'Conversation',
           headerRight: () => (
             <View style={styles.headerRight}>
+
               <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="call-outline" size={24} color="#007AFF" />
+                <Ionicons name="call-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="videocam-outline" size={24} color="#007AFF" />
+                <Ionicons name="videocam-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="ellipsis-vertical" size={24} color="#007AFF" />
+                <Ionicons name="ellipsis-vertical" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
           ),
         }}
       />
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -434,13 +490,27 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            onLayout={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 0)}
+            onLayout={() =>
+              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 0)
+            }
           />
 
           {showQuickMessages && (
-            <View style={styles.quickMessagesPanel}>
-              <View style={styles.quickMessagesPanelHeader}>
-                <Text style={styles.quickMessagesPanelTitle}>Quick Messages</Text>
+            <View
+              style={[
+                styles.quickMessagesPanel,
+                { backgroundColor: colors.card, borderTopColor: colors.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.quickMessagesPanelHeader,
+                  { borderBottomColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.quickMessagesPanelTitle, { color: colors.text }]}>
+                  Quick Messages
+                </Text>
                 <TouchableOpacity onPress={() => setShowQuickMessages(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -449,21 +519,43 @@ export default function ChatScreen() {
                 {quickMessages.map((qm, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.quickMessageItem}
+                    style={[
+                      styles.quickMessageItem,
+                      { borderBottomColor: colors.background },
+                    ]}
                     onPress={() => {
                       handleQuickMessage(qm.message);
                       setShowQuickMessages(false);
                     }}
                   >
-                    <Text style={styles.quickMessageShortcut}>{qm.shortcut}</Text>
-                    <Text style={styles.quickMessageText}>{qm.message}</Text>
+                    <Text
+                      style={[
+                        styles.quickMessageShortcut,
+                        { color: colors.primary },
+                      ]}
+                    >
+                      {qm.shortcut}
+                    </Text>
+                    <Text
+                      style={[styles.quickMessageText, { color: colors.text }]}
+                    >
+                      {qm.message}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
           )}
 
-          <View style={styles.inputContainer}>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: colors.card,
+                borderTopColor: colors.border,
+              },
+            ]}
+          >
             <TouchableOpacity
               style={styles.inputIconButton}
               onPress={() => setShowQuickMessages(!showQuickMessages)}
@@ -477,14 +569,21 @@ export default function ChatScreen() {
               disabled={uploading}
             >
               {uploading ? (
-                <ActivityIndicator size="small" color="#666" />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Ionicons name="image-outline" size={24} color="#666" />
               )}
             </TouchableOpacity>
 
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
               placeholder="Type a message..."
               value={inputText}
               onChangeText={handleTextChange}
@@ -494,17 +593,34 @@ export default function ChatScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.sendButton, inputText.trim().length > 0 && styles.sendButtonActive]}
+              style={[
+                styles.sendButton,
+                {
+                  backgroundColor:
+                    inputText.trim().length > 0 ? colors.primary : colors.border,
+                },
+              ]}
               onPress={handleSendMessage}
               disabled={inputText.trim().length === 0}
             >
-              <Ionicons name="send" size={20} color={inputText.trim().length > 0 ? '#fff' : '#999'} />
+              <Ionicons
+                name="send"
+                size={20}
+                color={inputText.trim().length > 0 ? '#fff' : '#888'}
+              />
             </TouchableOpacity>
           </View>
 
           {otherUserTyping && (
-            <View style={styles.typingIndicator}>
-              <Text style={styles.typingText}>{otherUser?.name || 'Someone'} is typing...</Text>
+            <View
+              style={[
+                styles.typingIndicator,
+                { backgroundColor: colors.card },
+              ]}
+            >
+              <Text style={[styles.typingText, { color: colors.secondary }]}>
+                {otherUser?.name || 'Someone'} is typing...
+              </Text>
             </View>
           )}
         </KeyboardAvoidingView>
@@ -516,25 +632,42 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   headerRight: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
     marginRight: 8,
+    alignItems: 'center',
   },
   headerButton: {
     padding: 4,
+  },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF6D1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 4,
+    gap: 4,
+  },
+  proBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B8860B',
   },
   keyboardView: {
     flex: 1,
   },
   messagesList: {
     padding: 16,
+    paddingBottom: 120,
   },
   messageContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 14,
     alignItems: 'flex-end',
   },
   ownMessageContainer: {
@@ -548,51 +681,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   messageAvatarPlaceholder: {
-    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   messageBubble: {
     maxWidth: '75%',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 12,
     elevation: 1,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  ownMessageBubble: {
-    backgroundColor: '#007AFF',
-  },
   senderName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 4,
   },
   messageText: {
     fontSize: 15,
-    color: '#333',
     lineHeight: 20,
-  },
-  ownMessageText: {
-    color: '#fff',
   },
   messageTime: {
     fontSize: 11,
-    color: '#999',
     marginTop: 4,
     alignSelf: 'flex-end',
   },
-  ownMessageTime: {
-    color: '#E3F2FD',
-  },
   quickMessagesPanel: {
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
     maxHeight: 200,
   },
   quickMessagesPanelHeader: {
@@ -601,12 +717,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   quickMessagesPanelTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   quickMessagesList: {
     padding: 8,
@@ -617,26 +731,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
   },
   quickMessageShortcut: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#007AFF',
     width: 40,
   },
   quickMessageText: {
     fontSize: 15,
-    color: '#333',
     flex: 1,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   inputIconButton: {
     padding: 8,
@@ -644,45 +753,39 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#333',
     maxHeight: 100,
     marginHorizontal: 8,
+    borderWidth: 1,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
-  },
-  sendButtonActive: {
-    backgroundColor: '#007AFF',
   },
   messageImage: {
     width: '100%',
     height: 200,
     borderRadius: 12,
     marginBottom: 8,
+    borderWidth: 1,
   },
   typingIndicator: {
     position: 'absolute',
     bottom: 70,
     left: 16,
-    backgroundColor: '#f0f0f0',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
   },
   typingText: {
     fontSize: 12,
-    color: '#666',
     fontStyle: 'italic',
   },
 });

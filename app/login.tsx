@@ -45,7 +45,7 @@ export default function LoginScreen() {
               <View style={styles.logoContainer}>
                 <Ionicons name="people-circle" size={80} color="#007AFF" />
               </View>
-              <Text style={styles.appName}>ConnectSphere</Text>
+              <Text style={styles.appName}>Flat Sphere</Text>
               <Text style={styles.tagline}>Connect with people around the world</Text>
             </View>
 

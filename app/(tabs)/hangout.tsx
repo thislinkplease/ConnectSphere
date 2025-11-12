@@ -4,12 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 import ApiService from '@/src/services/api';
 import { HANGOUT_ACTIVITIES } from '@/src/constants/options';
 
 export default function HangoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   const [isAvailable, setIsAvailable] = useState(false);
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [currentActivity, setCurrentActivity] = useState<string>('');
@@ -115,8 +117,8 @@ export default function HangoutScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={styles.headerTitle}>Hang Out</Text>
         <TouchableOpacity 
           style={styles.notificationButton}
@@ -128,7 +130,7 @@ export default function HangoutScreen() {
       
       <View style={styles.content}>
         {/* Availability Toggle Section */}
-        <View style={styles.availabilitySection}>
+        <View style={[styles.availabilitySection, { backgroundColor: colors.card }]}>
           <View style={styles.availabilityRow}>
             <View style={styles.availabilityText}>
               <Text style={styles.availabilityLabel}>Available to hang out now</Text>
@@ -154,27 +156,27 @@ export default function HangoutScreen() {
               style={styles.editStatusButton}
               onPress={() => setShowActivityModal(true)}
             >
-              <Ionicons name="create-outline" size={20} color="#007AFF" />
-              <Text style={styles.editStatusText}>Edit Status</Text>
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
+              <Text style={[styles.editStatusText, { color: colors.primary }]}>Edit Status</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Sliding Tabs */}
-        <View style={styles.tabsContainer}>
+        <View style={[styles.tabsContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'open' && styles.activeTab]}
+            style={[styles.tab, activeTab === 'open' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
             onPress={() => setActiveTab('open')}
           >
-            <Text style={[styles.tabText, activeTab === 'open' && styles.activeTabText]}>
+            <Text style={[styles.tabText, activeTab === 'open' && [styles.activeTabText, { color: colors.primary }]]}>
               Open Hangouts
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'my' && styles.activeTab]}
+            style={[styles.tab, activeTab === 'my' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
             onPress={() => setActiveTab('my')}
           >
-            <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>
+            <Text style={[styles.tabText, activeTab === 'my' && [styles.activeTabText, { color: colors.primary }]]}>
               My Hangouts
             </Text>
           </TouchableOpacity>
@@ -183,7 +185,7 @@ export default function HangoutScreen() {
         {/* Tab Content */}
         {loading && !refreshing ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : activeTab === 'open' ? (
           <FlatList
@@ -242,8 +244,8 @@ export default function HangoutScreen() {
         onRequestClose={() => setShowActivityModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <Text style={styles.modalTitle}>Select Activities</Text>
               <TouchableOpacity onPress={() => setShowActivityModal(false)}>
                 <Ionicons name="close" size={24} color="#333" />
@@ -254,13 +256,13 @@ export default function HangoutScreen() {
               {HANGOUT_ACTIVITIES.map((activity) => (
                 <TouchableOpacity
                   key={activity.id}
-                  style={styles.activityOption}
+                  style={[styles.activityOption, { borderBottomColor: colors.border }]}
                   onPress={() => handleToggleActivity(activity.id)}
                 >
                   <Text style={styles.activityLabel}>{activity.label}</Text>
-                  <View style={styles.checkbox}>
+                  <View style={[styles.checkbox, { borderColor: colors.primary }]}>
                     {selectedActivities.includes(activity.id) && (
-                      <Ionicons name="checkmark" size={18} color="#007AFF" />
+                      <Ionicons name="checkmark" size={18} color={colors.primary} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -268,7 +270,7 @@ export default function HangoutScreen() {
             </ScrollView>
 
             <TouchableOpacity
-              style={styles.modalSaveButton}
+              style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
               onPress={handleSaveActivities}
             >
               <Text style={styles.modalSaveText}>Save</Text>
@@ -283,13 +285,10 @@ export default function HangoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
-    backgroundColor: '#fff',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -324,7 +323,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   availabilitySection: {
-    backgroundColor: '#fff',
     padding: 16,
     marginBottom: 8,
   },
@@ -356,15 +354,12 @@ const styles = StyleSheet.create({
   },
   editStatusText: {
     fontSize: 15,
-    color: '#007AFF',
     marginLeft: 6,
     fontWeight: '500',
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   tab: {
     flex: 1,
@@ -374,7 +369,6 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: '#007AFF',
   },
   tabText: {
     fontSize: 15,
@@ -382,7 +376,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   activeTabText: {
-    color: '#007AFF',
     fontWeight: '600',
   },
   tabContent: {
@@ -437,7 +430,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
@@ -448,7 +440,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   modalTitle: {
     fontSize: 18,
@@ -464,7 +455,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   activityLabel: {
     fontSize: 16,
@@ -474,13 +464,11 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: '#007AFF',
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalSaveButton: {
-    backgroundColor: '#007AFF',
     padding: 16,
     margin: 16,
     borderRadius: 12,

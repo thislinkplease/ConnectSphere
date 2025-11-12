@@ -5,10 +5,13 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/src/context/ThemeContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-
+  const { colors } = useTheme();
+  
   return (
     <Tabs
       screenOptions={{
@@ -37,8 +40,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="discussion"
         options={{
-          title: 'Discussion',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bubble.left.and.bubble.right.fill" color={color} />,
+          title: 'Feed',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons size={24} name="earth" color={color} />,
         }}
       />
       <Tabs.Screen

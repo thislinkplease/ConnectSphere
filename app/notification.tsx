@@ -6,10 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Notification } from '@/src/types';
 import { getRelativeTime } from '@/src/utils/date';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 import ApiService from '@/src/services/api';
 
 export default function NotificationScreen() {
   const { user } = useAuth();
+  const { colors } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,7 +78,7 @@ export default function NotificationScreen() {
         case 'event':
           return '#4CAF50';
         case 'message':
-          return '#007AFF';
+          return colors.primary;
         case 'hangout':
           return '#FF9800';
         case 'connection':
@@ -144,10 +146,10 @@ export default function NotificationScreen() {
           ),
         }}
       />
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         {unreadCount > 0 && (
-          <View style={styles.unreadBanner}>
-            <Text style={styles.unreadBannerText}>
+          <View style={[styles.unreadBanner, { backgroundColor: colors.primary + '20' }]}>
+            <Text style={[styles.unreadBannerText, { color: colors.primary }]}>
               {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
             </Text>
           </View>
@@ -155,7 +157,7 @@ export default function NotificationScreen() {
 
         {loading && !refreshing ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList
@@ -184,14 +186,14 @@ export default function NotificationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    
   },
   headerButton: {
     marginRight: 12,
   },
   headerButtonText: {
     fontSize: 14,
-    color: '#007AFF',
+    
     fontWeight: '600',
   },
   unreadBanner: {
@@ -207,7 +209,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   notificationItem: {
-    backgroundColor: '#fff',
+    
     flexDirection: 'row',
     padding: 16,
     borderBottomWidth: 1,
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#007AFF',
+    
     marginLeft: 8,
     marginTop: 4,
   },

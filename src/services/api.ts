@@ -2,7 +2,6 @@ import axios, { AxiosInstance } from 'axios';
 import {
   User,
   Event,
-  Hangout,
   Chat,
   Message,
   Community,
@@ -17,6 +16,26 @@ import {
 // Base API configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.example.com';
 
+// Request deduplication cache
+interface PendingRequest {
+  promise: Promise<any>;
+  timestamp: number;
+}
+
+const pendingRequests = new Map<string, PendingRequest>();
+const REQUEST_CACHE_DURATION = 1000; // 1 second cache for pending requests
+
+// Helper function to map server user response to client User type
+function mapServerUserToClient(serverUser: any): User {
+  return {
+    ...serverUser,
+    // Map server field names to client field names
+    followersCount: serverUser.followers ?? serverUser.followersCount ?? 0,
+    followingCount: serverUser.following ?? serverUser.followingCount ?? 0,
+    postsCount: serverUser.posts ?? serverUser.postsCount ?? 0,
+    isPro: serverUser.is_premium ?? serverUser.isPro ?? false,
+  };
+}
 
 class ApiService {
   private client: AxiosInstance;
@@ -30,7 +49,7 @@ class ApiService {
       },
     });
 
-    // Add request interceptor for logging
+    // Add request interceptor for logging and deduplication
     this.client.interceptors.request.use(
       (config) => {
         console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
@@ -90,15 +109,51 @@ class ApiService {
     delete this.client.defaults.headers.common['Authorization'];
   }
 
+  // Helper method to deduplicate GET requests
+  private async deduplicatedGet<T>(url: string, params?: any): Promise<T> {
+    // Only deduplicate GET requests (safe for read operations)
+    const cacheKey = `GET:${url}:${JSON.stringify(params || {})}`;
+    const now = Date.now();
+    
+    // Check if there's a pending request for the same endpoint
+    const pending = pendingRequests.get(cacheKey);
+    if (pending && (now - pending.timestamp) < REQUEST_CACHE_DURATION) {
+      console.log(`Deduplicating request: ${url}`);
+      return pending.promise;
+    }
+    
+    // Create new request
+    const promise = this.client.get(url, { params }).then(response => {
+      // Clean up from pending requests after completion
+      pendingRequests.delete(cacheKey);
+      return response.data;
+    }).catch(error => {
+      // Clean up from pending requests on error
+      pendingRequests.delete(cacheKey);
+      throw error;
+    });
+    
+    // Store pending request
+    pendingRequests.set(cacheKey, { promise, timestamp: now });
+    
+    return promise;
+  }
+
   // Auth endpoints
   async login(credentials: LoginCredentials): Promise<{ user: User; token: string }> {
     const response = await this.client.post('/auth/login', credentials);
-    return response.data;
+    return {
+      ...response.data,
+      user: mapServerUserToClient(response.data.user),
+    };
   }
 
   async signup(data: SignupData): Promise<{ user: User; token: string }> {
     const response = await this.client.post('/auth/signup', data);
-    return response.data;
+    return {
+      ...response.data,
+      user: mapServerUserToClient(response.data.user),
+    };
   }
 
   async logout(): Promise<void> {
@@ -108,17 +163,17 @@ class ApiService {
   // User endpoints
   async getCurrentUser(): Promise<User> {
     const response = await this.client.get('/users/me');
-    return response.data;
+    return mapServerUserToClient(response.data);
   }
 
   async getUserByUsername(username: string): Promise<User> {
-    const response = await this.client.get(`/users/username/${username}`);
-    return response.data;
+    const data = await this.deduplicatedGet(`/users/username/${username}`);
+    return mapServerUserToClient(data);
   }
 
   async updateUser(userId: string, data: Partial<User>): Promise<User> {
     const response = await this.client.put(`/users/${userId}`, data);
-    return response.data;
+    return mapServerUserToClient(response.data);
   }
 
   async uploadAvatar(userId: string, image: any): Promise<{ avatarUrl: string }> {
@@ -142,19 +197,20 @@ class ApiService {
     });
   }
 
+  
   async getUsers(filters?: ConnectionFilters): Promise<User[]> {
-    const response = await this.client.get('/users', { params: filters });
-    return response.data;
+    const data: any[] = await this.deduplicatedGet('/users', filters);
+    return (data || []).map(mapServerUserToClient);
   }
 
   async getUserById(userId: string): Promise<User> {
-    const response = await this.client.get(`/users/${userId}`);
-    return response.data;
+    const data = await this.deduplicatedGet(`/users/${userId}`);
+    return mapServerUserToClient(data);
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    const response = await this.client.get('/users/search', { params: { q: query } });
-    return response.data;
+    const data: any[] = await this.deduplicatedGet('/users/search', { q: query });
+    return (data || []).map(mapServerUserToClient);
   }
 
   async followUser(username: string, followerUsername: string): Promise<void> {
@@ -174,6 +230,63 @@ class ApiService {
       return false;
     }
   }
+
+  async getFollowers(username: string): Promise<User[]> {
+    try {
+      const response = await this.client.get(`/users/${username}/followers`);
+      return (response.data || []).map((u: any) => mapServerUserToClient({
+        id: String(u.id || u.username),
+        username: u.username || '',
+        name: u.name || u.username || '',
+        email: u.email || `${u.username}@example.com`,
+        avatar: u.avatar || '',
+        country: u.country || '',
+        city: u.city || '',
+        status: u.status || 'Chilling',
+        languages: u.languages || [],
+        interests: u.interests || [],
+        bio: u.bio,
+        gender: u.gender,
+        age: u.age,
+        flag: u.flag,
+        followers: u.followers,
+        following: u.following,
+        posts: u.posts,
+      }));
+    } catch (error) {
+      console.error('Error getting followers:', error);
+      return [];
+    }
+  }
+
+  async getFollowing(username: string): Promise<User[]> {
+    try {
+      const response = await this.client.get(`/users/${username}/following`);
+      return (response.data || []).map((u: any) => mapServerUserToClient({
+        id: String(u.id || u.username),
+        username: u.username || '',
+        name: u.name || u.username || '',
+        email: u.email || `${u.username}@example.com`,
+        avatar: u.avatar || '',
+        country: u.country || '',
+        city: u.city || '',
+        status: u.status || 'Chilling',
+        languages: u.languages || [],
+        interests: u.interests || [],
+        bio: u.bio,
+        gender: u.gender,
+        age: u.age,
+        flag: u.flag,
+        followers: u.followers,
+        following: u.following,
+        posts: u.posts,
+      }));
+    } catch (error) {
+      console.error('Error getting following:', error);
+      return [];
+    }
+  }
+
    // Create or get existing direct conversation with otherUsername
   async createOrGetDirectConversation(currentUsername: string, otherUsername: string): Promise<{ id: string | number }> {
     const response = await this.client.post('/messages/conversations', {
@@ -201,8 +314,7 @@ class ApiService {
   }
 
   async getProfileCompletion(username: string): Promise<any> {
-    const response = await this.client.get(`/users/${username}/profile-completion`);
-    return response.data;
+    return this.deduplicatedGet(`/users/${username}/profile-completion`);
   }
 
   // Event endpoints
@@ -261,22 +373,17 @@ class ApiService {
     user_lng?: number;
     limit?: number;
   }): Promise<any[]> {
-    const res = await this.client.get(`/hangouts`, {
-      params: {
-        languages: params?.languages?.join(","),
-        distance_km: params?.distance_km,
-        user_lat: params?.user_lat,
-        user_lng: params?.user_lng,
-        limit: params?.limit,
-      },
+    return this.deduplicatedGet(`/hangouts`, {
+      languages: params?.languages?.join(","),
+      distance_km: params?.distance_km,
+      user_lat: params?.user_lat,
+      user_lng: params?.user_lng,
+      limit: params?.limit,
     });
-    return res.data;
   }
 
   async getMyHangouts(username: string): Promise<any[]> {
-  
-    const res = await this.client.get(`/hangouts/user/${encodeURIComponent(username)}/joined`);
-    return res.data;
+    return this.deduplicatedGet(`/hangouts/user/${encodeURIComponent(username)}/joined`);
   }
 
   async getHangoutStatus(username: string): Promise<{
@@ -285,8 +392,7 @@ class ApiService {
     current_activity?: string;
     activities?: string[];
   }> {
-    const res = await this.client.get(`/hangouts/status/${encodeURIComponent(username)}`);
-    return res.data;
+    return this.deduplicatedGet(`/hangouts/status/${encodeURIComponent(username)}`);
   }
 
   async createHangout(data: any): Promise<any> {
@@ -299,63 +405,130 @@ class ApiService {
   }
 
   // Chat endpoints
- async getConversations(username: string): Promise<Chat[]> {
-    const response = await this.client.get('/messages/conversations', { params: { user: username } });
-    const raw = response.data;
+  async getConversations(username: string): Promise<Chat[]> {
+    const raw: any = await this.deduplicatedGet('/messages/conversations', { user: username });
 
     return (raw || []).map((c: any) => {
-      const last = c.last_message
+      // Map participants nếu server có
+      let participants: User[] = (c.participants || []).map((p: any) => mapServerUserToClient({
+        id: String(p.id || p.username),
+        username: p.username || '',
+        name: p.name || p.username || '',
+        email: p.email || `${p.username}@example.com`,
+        avatar: p.avatar || '',
+        country: p.country || '',
+        city: p.city || '',
+        status: p.status || 'Chilling',
+        languages: p.languages || [],
+        interests: p.interests || [],
+        bio: p.bio,
+        gender: p.gender,
+        age: p.age,
+        flag: p.flag,
+        followers: p.followers,
+        following: p.following,
+        posts: p.posts,
+      }));
+
+      const lastRaw = c.last_message;
+      const lastMessage = lastRaw
         ? {
-            id: String(c.last_message.id),
-            chatId: String(c.last_message.conversation_id ?? c.id),
-            senderId: c.last_message.sender_username,
-            sender: {
-              id: c.last_message.sender?.id ?? c.last_message.sender_username,
-              username: c.last_message.sender?.username ?? c.last_message.sender_username,
-              name: c.last_message.sender?.name ?? c.last_message.sender_username,
-              avatar: c.last_message.sender?.avatar ?? '',
-              // Các field khác có thể bổ sung sau nếu cần
-              email: (c.last_message.sender?.username || 'unknown') + '@example.com',
-              country: '',
-              city: '',
-              status: 'Chilling',
-              languages: [],
-              interests: [],
-            },
-            content: c.last_message.content || '',
-            image: c.last_message.message_media?.[0]?.media_url,
-            timestamp: c.last_message.created_at, 
-            read: false,
+            id: String(lastRaw.id),
+            chatId: String(lastRaw.conversation_id ?? c.id),
+            senderId: lastRaw.sender_username,
+            sender: mapServerUserToClient({
+              id: lastRaw.sender?.id ?? lastRaw.sender_username,
+              username: lastRaw.sender?.username ?? lastRaw.sender_username,
+              name: lastRaw.sender?.name ?? lastRaw.sender_username,
+              avatar: lastRaw.sender?.avatar ?? '',
+              email: (lastRaw.sender?.username || 'unknown') + '@example.com',
+              country: lastRaw.sender?.country || '',
+              city: lastRaw.sender?.city || '',
+              status: lastRaw.sender?.status || 'Chilling',
+              languages: lastRaw.sender?.languages || [],
+              interests: lastRaw.sender?.interests || [],
+              followers: lastRaw.sender?.followers,
+              following: lastRaw.sender?.following,
+              posts: lastRaw.sender?.posts,
+            }),
+            content: lastRaw.content || '',
+            image: lastRaw.message_media?.[0]?.media_url,
+            timestamp: lastRaw.created_at, 
+            read: lastRaw.is_read || false,
           }
         : undefined;
 
+      // map dm -> user để khớp với type hiện tại ở client
+      const mappedType: 'event' | 'user' | 'group' =
+        c.type === 'group' ? 'group'
+        : c.type === 'event' ? 'event'
+        : 'user';
+
+      // REBUILD participants cho DM nếu thiếu otherUser:
+      if (mappedType === 'user') {
+        const usernames = new Set(participants.map(p => p.username).filter(Boolean));
+        // Thêm currentUser nếu thiếu
+        if (username && !usernames.has(username)) {
+          participants.push(mapServerUserToClient({
+            id: username,
+            username,
+            name: username,
+            email: `${username}@example.com`,
+            avatar: '',
+            country: '',
+            city: '',
+            status: 'Chilling',
+            languages: [],
+            interests: [],
+          }));
+          usernames.add(username);
+        }
+        // Thêm người còn lại từ lastMessage.sender nếu khác currentUser
+        if (lastMessage?.sender?.username && lastMessage.sender.username !== username && !usernames.has(lastMessage.sender.username)) {
+          participants.push(lastMessage.sender);
+          usernames.add(lastMessage.sender.username);
+        }
+      }
+
       return {
         id: String(c.id),
-        type: c.type === 'dm' ? 'user' : c.type === 'group' ? 'group' : (c.type || 'user'),
+        type: mappedType,
         name: c.title || undefined,
-        participants: [], 
-        lastMessage: last,
+        participants,
+        lastMessage,
         unreadCount: c.unread_count ?? 0,
         eventId: undefined,
       } as Chat;
     });
   }
 
-async getConversation(conversationId: string): Promise<Chat> {
-  const response = await this.client.get(`/messages/conversations/${conversationId}`);
-  const c = response.data;
-  return {
-    id: String(c.id),
-    type: c.type === 'dm' ? 'user' : c.type === 'group' ? 'group' : c.type,
-    name: c.title || undefined,
-    participants: (c.participants || []).map((p: any) => ({
-      id: p.id,
-      username: p.username,
-      name: p.name,
-      avatar: p.avatar,
-    })),
-  };
-}
+  async getConversation(conversationId: string): Promise<Chat> {
+    const c: any = await this.deduplicatedGet(`/messages/conversations/${conversationId}`);
+    return {
+      id: String(c.id),
+      type: c.type === 'group' ? 'group' : (c.type === 'event' ? 'event' : 'user'),
+      name: c.title || undefined,
+      participants: (c.participants || []).map((p: any) => mapServerUserToClient({
+        id: String(p.id || p.username),
+        username: p.username || '',
+        name: p.name || p.username || '',
+        email: p.email || `${p.username}@example.com`,
+        avatar: p.avatar || '',
+        country: p.country || '',
+        city: p.city || '',
+        status: p.status || 'Chilling',
+        languages: p.languages || [],
+        interests: p.interests || [],
+        bio: p.bio,
+        gender: p.gender,
+        age: p.age,
+        flag: p.flag,
+        followers: p.followers,
+        following: p.following,
+        posts: p.posts,
+      })),
+    };
+  }
 
 async getChatMessages(conversationId: string): Promise<Message[]> {
   const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
@@ -394,11 +567,20 @@ async getChatMessages(conversationId: string): Promise<Message[]> {
     return response.data;
   }
 
-  async markMessagesAsRead(conversationId: string, username: string, upToMessageId: number): Promise<void> {
-    await this.client.post(`/messages/conversations/${conversationId}/read`, {
-      username,
-      up_to_message_id: upToMessageId,
-    });
+  async markMessagesAsRead(
+    conversationId: string,
+    username: string,
+    upToMessageId?: number | string
+  ): Promise<void> {
+    const body: any = { username };
+    if (upToMessageId !== undefined && upToMessageId !== null && `${upToMessageId}` !== '') {
+      body.up_to_message_id = Number(upToMessageId);
+    }
+    await this.client.post(`/messages/conversations/${conversationId}/read`, body);
+  }
+
+  async markAllMessagesAsRead(conversationId: string, username: string): Promise<void> {
+    await this.client.post(`/messages/conversations/${conversationId}/read`, { username });
   }
 
   // Quick messages
@@ -429,6 +611,28 @@ async getChatMessages(conversationId: string): Promise<Message[]> {
       return response.data;
     } catch {
       return null;
+    }
+  }
+
+  // Pro subscription endpoints
+  async activateProSubscription(username: string): Promise<void> {
+    await this.client.post('/payments/subscribe', { username, plan_type: 'pro' });
+  }
+
+  async deactivateProSubscription(username: string): Promise<void> {
+    await this.client.post('/payments/cancel', { username });
+  }
+
+  async getProStatus(username: string): Promise<{ isPro: boolean; expiresAt?: string }> {
+    try {
+      const subscription: any = await this.deduplicatedGet('/payments/subscription', { username });
+      return { 
+        isPro: subscription?.plan_type === 'pro' && subscription?.status === 'active',
+        expiresAt: subscription?.end_date 
+      };
+    } catch (error) {
+      console.error('Error getting pro status:', error);
+      return { isPro: false };
     }
   }
 

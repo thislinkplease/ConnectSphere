@@ -7,10 +7,12 @@ import { User } from '@/src/types';
 import ApiService from '@/src/services/api';
 import LocationService from '@/src/services/location';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 
 export default function ConnectionScreen() {
   const router = useRouter();
   const { user: currentUser } = useAuth();
+  const { colors } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,7 +175,7 @@ export default function ConnectionScreen() {
               {item.city}, {item.country}
             </Text>
             {item.distance !== undefined && (
-              <Text style={styles.distanceText}>
+              <Text style={[styles.distanceText, { color: colors.primary }]}>
                 • {LocationService.formatDistance(item.distance)}
               </Text>
             )}
@@ -209,13 +211,13 @@ export default function ConnectionScreen() {
         
         {/* Follow Button */}
         <TouchableOpacity
-          style={[styles.followButton, isFollowing && styles.followingButton]}
+          style={[styles.followButton, isFollowing && [styles.followingButton, { backgroundColor: colors.primary, borderColor: colors.primary }], !isFollowing && { borderColor: colors.primary }]}
           onPress={(e) => handleFollowToggle(item, e)}
         >
           <Ionicons 
             name={isFollowing ? "checkmark" : "person-add-outline"} 
             size={18} 
-            color={isFollowing ? "#fff" : "#007AFF"} 
+            color={isFollowing ? "#fff" : colors.primary} 
           />
         </TouchableOpacity>
       </TouchableOpacity>
@@ -223,12 +225,12 @@ export default function ConnectionScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={styles.headerTitle}>Connection</Text>
       </View>
 
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
@@ -241,16 +243,16 @@ export default function ConnectionScreen() {
           style={styles.filterButton}
           onPress={() => setShowFilters(true)}
         >
-          <Ionicons name="options-outline" size={24} color="#007AFF" />
+          <Ionicons name="options-outline" size={24} color={colors.primary} />
           {(selectedDistance || selectedGender) && (
             <View style={styles.filterBadge} />
           )}
         </TouchableOpacity>
       </View>
 
-      <View style={styles.viewModeToggle}>
+      <View style={[styles.viewModeToggle, { backgroundColor: colors.card }]}>
         <TouchableOpacity
-          style={[styles.viewModeButton, viewMode === 'users' && styles.viewModeButtonActive]}
+          style={[styles.viewModeButton, viewMode === 'users' && [styles.viewModeButtonActive, { backgroundColor: colors.primary }]]}
           onPress={() => setViewMode('users')}
         >
           <Text style={[styles.viewModeText, viewMode === 'users' && styles.viewModeTextActive]}>
@@ -258,7 +260,7 @@ export default function ConnectionScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.viewModeButton, viewMode === 'events' && styles.viewModeButtonActive]}
+          style={[styles.viewModeButton, viewMode === 'events' && [styles.viewModeButtonActive, { backgroundColor: colors.primary }]]}
           onPress={() => setViewMode('events')}
         >
           <Text style={[styles.viewModeText, viewMode === 'events' && styles.viewModeTextActive]}>
@@ -270,7 +272,7 @@ export default function ConnectionScreen() {
       {viewMode === 'users' && (
         loading && !refreshing ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList
@@ -306,15 +308,15 @@ export default function ConnectionScreen() {
         onRequestClose={() => setShowFilters(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <Text style={styles.modalTitle}>Filters</Text>
               <TouchableOpacity onPress={() => setShowFilters(false)}>
                 <Ionicons name="close" size={28} color="#666" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.filterSection}>
+            <View style={[styles.filterSection, { borderBottomColor: colors.border }]}>
               <Text style={styles.filterLabel}>Distance</Text>
               <View style={styles.filterOptions}>
                 {[1, 2, 5, 10, 20, 50].map((dist) => (
@@ -322,13 +324,14 @@ export default function ConnectionScreen() {
                     key={dist}
                     style={[
                       styles.filterOption,
-                      selectedDistance === dist && styles.filterOptionActive
+                      { borderColor: colors.border },
+                      selectedDistance === dist && [styles.filterOptionActive, { borderColor: colors.primary, backgroundColor: colors.primary + '20' }]
                     ]}
                     onPress={() => setSelectedDistance(selectedDistance === dist ? null : dist)}
                   >
                     <Text style={[
                       styles.filterOptionText,
-                      selectedDistance === dist && styles.filterOptionTextActive
+                      selectedDistance === dist && [styles.filterOptionTextActive, { color: colors.primary }]
                     ]}>
                       {dist}km
                     </Text>
@@ -337,7 +340,7 @@ export default function ConnectionScreen() {
               </View>
             </View>
 
-            <View style={styles.filterSection}>
+            <View style={[styles.filterSection, { borderBottomColor: colors.border }]}>
               <Text style={styles.filterLabel}>Gender</Text>
               <View style={styles.filterOptions}>
                 {(['Male', 'Female'] as const).map((gender) => (
@@ -345,13 +348,14 @@ export default function ConnectionScreen() {
                     key={gender}
                     style={[
                       styles.filterOption,
-                      selectedGender === gender && styles.filterOptionActive
+                      { borderColor: colors.border },
+                      selectedGender === gender && [styles.filterOptionActive, { borderColor: colors.primary, backgroundColor: colors.primary + '20' }]
                     ]}
                     onPress={() => setSelectedGender(selectedGender === gender ? null : gender)}
                   >
                     <Text style={[
                       styles.filterOptionText,
-                      selectedGender === gender && styles.filterOptionTextActive
+                      selectedGender === gender && [styles.filterOptionTextActive, { color: colors.primary }]
                     ]}>
                       {gender}
                     </Text>
@@ -362,17 +366,17 @@ export default function ConnectionScreen() {
 
             <View style={styles.filterActions}>
               <TouchableOpacity
-                style={styles.clearButton}
+                style={[styles.clearButton, { borderColor: colors.primary }]}
                 onPress={() => {
                   setSelectedDistance(null);
                   setSelectedGender(null);
                   setAgeRange([18, 65]);
                 }}
               >
-                <Text style={styles.clearButtonText}>Clear All</Text>
+                <Text style={[styles.clearButtonText, { color: colors.primary }]}>Clear All</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.applyButton}
+                style={[styles.applyButton, { backgroundColor: colors.primary }]}
                 onPress={() => setShowFilters(false)}
               >
                 <Text style={styles.applyButtonText}>Apply Filters</Text>
@@ -388,13 +392,10 @@ export default function ConnectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
-    backgroundColor: '#fff',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
     fontSize: 24,
@@ -402,13 +403,11 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   searchContainer: {
-    backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   searchIcon: {
     marginRight: 8,
@@ -420,7 +419,6 @@ const styles = StyleSheet.create({
   },
   viewModeToggle: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     padding: 12,
     gap: 8,
   },
@@ -432,7 +430,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   viewModeButtonActive: {
-    backgroundColor: '#007AFF',
   },
   viewModeText: {
     fontSize: 15,
@@ -547,13 +544,10 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: '#fff',
     borderWidth: 2,
-    borderColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   followingButton: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -586,7 +580,6 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     fontSize: 13,
-    color: '#007AFF',
     marginLeft: 8,
     fontWeight: '600',
   },
@@ -596,7 +589,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 20,
@@ -610,7 +602,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
     fontSize: 20,
@@ -621,7 +612,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   filterLabel: {
     fontSize: 16,
@@ -639,11 +629,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
   },
   filterOptionActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#E3F2FD',
   },
   filterOptionText: {
     fontSize: 14,
@@ -651,7 +638,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterOptionTextActive: {
-    color: '#007AFF',
     fontWeight: '600',
   },
   filterActions: {
@@ -665,19 +651,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#007AFF',
     alignItems: 'center',
   },
   clearButtonText: {
     fontSize: 16,
-    color: '#007AFF',
     fontWeight: '600',
   },
   applyButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#007AFF',
     alignItems: 'center',
   },
   applyButtonText: {

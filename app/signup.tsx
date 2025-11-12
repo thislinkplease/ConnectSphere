@@ -64,7 +64,7 @@ export default function SignupScreen() {
         >
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>Join ConnectSphere</Text>
+              <Text style={styles.headerTitle}>Join Flat Sphere</Text>
               <Text style={styles.headerSubtitle}>
                 Create an account to connect with people around the world
               </Text>

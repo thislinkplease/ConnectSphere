@@ -18,6 +18,7 @@ export interface User {
   followersCount?: number;
   followingCount?: number;
   postsCount?: number;
+  isPro?: boolean;
   specialties?: {
     from?: string;
     interests?: string[];
