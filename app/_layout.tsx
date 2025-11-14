@@ -20,59 +20,58 @@ export default function RootLayout() {
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="signup" options={{ presentation: 'card' }} />
+            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+            <Stack.Screen name="auth/signup" options={{ presentation: 'card' }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             <Stack.Screen 
-              name="notification" 
+              name="feed/notification" 
               options={{ 
                 presentation: 'card',
                 title: 'Notifications',
               }} 
             />
             <Stack.Screen 
-              name="event-detail" 
+              name="feed/event-detail" 
               options={{ 
                 presentation: 'card',
                 title: 'Event Details',
               }} 
             />
             <Stack.Screen 
-              name="chat" 
+              name="inbox/chat" 
               options={{ 
                 presentation: 'card',
               }} 
             />
             <Stack.Screen 
-              name="profile" 
+              name="account/profile" 
               options={{ 
                 presentation: 'card',
               }} 
             />
             <Stack.Screen 
-              name="edit-profile" 
+              name="account/edit-profile" 
               options={{ 
                 presentation: 'card',
                 title: 'Edit Profile',
               }} 
             />
             <Stack.Screen 
-              name="settings" 
+              name="account/settings" 
               options={{ 
                 presentation: 'card',
                 title: 'Settings',
               }} 
             />
             <Stack.Screen 
-              name="payment-pro" 
+              name="account/payment-pro" 
               options={{ 
                 presentation: 'card',
                 title: 'Pro Features',
               }} 
             />
             <Stack.Screen 
-              name="followers-list" 
+              name="account/followers-list" 
               options={{ 
                 presentation: 'card',
               }} 

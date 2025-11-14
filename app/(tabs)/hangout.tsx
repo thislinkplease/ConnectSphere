@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, Switch, TouchableOpacity, FlatList,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Bell } from 'lucide-react-native';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import ApiService from '@/src/services/api';
@@ -122,9 +123,9 @@ export default function HangoutScreen() {
         <Text style={styles.headerTitle}>Hang Out</Text>
         <TouchableOpacity 
           style={styles.notificationButton}
-          onPress={() => router.push('/notification')}
+          onPress={() => router.push('/feed/notification')}
         >
-          <Ionicons name="notifications-outline" size={24} color="#333" />
+          <Bell color="#333" size={24} />
         </TouchableOpacity>
       </View>
       

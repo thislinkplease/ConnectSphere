@@ -152,7 +152,7 @@ export default function InboxScreen() {
     } catch (e) {
       console.warn('mark read failed:', e);
     } finally {
-      router.push(`/chat?id=${chat.id}`);
+      router.push(`/inbox/chat?id=${chat.id}`);
     }
   }, [router, user?.username]);
 

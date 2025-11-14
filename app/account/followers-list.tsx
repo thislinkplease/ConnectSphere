@@ -38,7 +38,7 @@ export default function FollowersListScreen() {
   const renderUserItem = ({ item }: { item: User }) => (
     <TouchableOpacity
       style={styles.userItem}
-      onPress={() => router.push(`/profile?username=${item.username}`)}
+      onPress={() => router.push(`/account/profile?username=${item.username}`)}
     >
       {item.avatar ? (
         <Image source={{ uri: item.avatar }} style={styles.avatar} />

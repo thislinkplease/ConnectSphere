@@ -55,7 +55,7 @@ export default function ProfileScreen() {
           currentUser.username,
           user.username
         );
-        router.push(`/chat?id=${conv.id}`);
+        router.push(`/inbox/chat?id=${conv.id}`);
       } catch (error) {
         console.error('Error creating/getting DM conversation:', error);
         Alert.alert('Error', 'Failed to open chat');

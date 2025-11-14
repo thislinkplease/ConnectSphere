@@ -33,7 +33,7 @@ export default function SettingsScreen() {
           onPress: async () => {
             try {
               await logout();
-              router.replace('/login');
+              router.replace('/auth/login');
             } catch (error) {
               console.error('Logout error:', error);
               Alert.alert('Error', 'Failed to logout. Please try again.');
@@ -120,7 +120,7 @@ export default function SettingsScreen() {
             <SettingRow
               icon="person-outline"
               title="Edit Profile"
-              onPress={() => router.push('/edit-profile')}
+              onPress={() => router.push('/account/edit-profile')}
               showChevron
             />
             <SettingRow

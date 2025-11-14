@@ -15,13 +15,13 @@ export default function Index() {
 
     if (!isAuthenticated && inAuthGroup) {
       // Redirect to login if not authenticated
-      router.replace('/login');
+      router.replace('/auth/login');
     } else if (isAuthenticated && !inAuthGroup) {
       // Redirect to tabs if authenticated
       router.replace('/(tabs)/hangout');
     } else if (!isAuthenticated) {
       // Initial load - show login
-      router.replace('/login');
+      router.replace('/auth/login');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isLoading, segments]);

@@ -1,17 +1,14 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-
+import { Text, StyleSheet, View } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Home, UserRound, Compass, MessageCircleMore, Users } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTheme } from '@/src/context/ThemeContext';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { colors } = useTheme();
-  
+
   return (
     <Tabs
       screenOptions={{
@@ -19,65 +16,98 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          height: 60,
-          paddingBottom: 8,
+          height: 105,
+          paddingTop: 20,
         },
-      }}>
-      <Tabs.Screen
-        name="hangout"
-        options={{
-          title: 'Hang out',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="my-events"
-        options={{
-          title: 'My events',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="calendar" color={color} />,
-        }}
-      />
+      }}
+    >
       <Tabs.Screen
         name="discussion"
         options={{
-          title: 'Feed',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons size={24} name="earth" color={color} />,
+          tabBarLabel: ({ focused, color }) => (
+            <View style={styles.labelContainer}>
+              <Text style={[styles.tabLabel, { color: focused ? color : '#999' }]}>
+                {focused ? '' : 'Discussion'} 
+              </Text>
+            </View>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Home size={focused ? 35 : 24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="connection"
         options={{
-          title: 'Connection',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.3.fill" color={color} />,
+          tabBarLabel: ({ focused, color }) => (
+            <View style={styles.labelContainer}>
+              <Text style={[styles.tabLabel, { color: focused ? color : '#999' }]}>
+                {focused ? '' : 'Connection'} 
+              </Text>
+            </View>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Users size={focused ? 35 : 24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="hangout"
+        options={{
+          tabBarLabel: ({ focused, color }) => (
+            <View style={styles.labelContainer}>
+              <Text style={[styles.tabLabel, { color: focused ? color : '#999' }]}>
+                {focused ? '' : 'Hangout'}
+              </Text>
+            </View>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <Compass size={focused ? 40 : 24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Inbox',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="envelope.fill" color={color} />,
+          tabBarLabel: ({ focused, color }) => (
+            <View style={styles.labelContainer}>
+              <Text style={[styles.tabLabel, { color: focused ? color : '#999' }]}>
+                {focused ? '' : 'Inbox'}
+              </Text>
+            </View>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <MessageCircleMore size={focused ? 35 : 24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Account',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
-        }}
-      />
-      {/* Hide old tabs but keep files for reference */}
-      <Tabs.Screen
-        name="index-old"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: null,
+          tabBarLabel: ({ focused, color }) => (
+            <View style={styles.labelContainer}>
+              <Text style={[styles.tabLabel, { color: focused ? color : '#999' }]}>
+                {focused ? '' : 'Account'}
+              </Text>
+            </View>
+          ),
+          tabBarIcon: ({ color, focused }) => (
+            <UserRound size={focused ? 35 : 24} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabLabel: {
+    fontSize: 10
+  },
+  labelContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 30,
+  },
+});
