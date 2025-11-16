@@ -30,6 +30,7 @@ function mapServerUserToClient(serverUser: any): User {
   return {
     ...serverUser,
     // Map server field names to client field names
+    backgroundImage: serverUser.background_image ?? serverUser.backgroundImage,
     followersCount: serverUser.followers ?? serverUser.followersCount ?? 0,
     followingCount: serverUser.following ?? serverUser.followingCount ?? 0,
     postsCount: serverUser.posts ?? serverUser.postsCount ?? 0,
@@ -180,6 +181,15 @@ class ApiService {
     const formData = new FormData();
     formData.append('avatar', image);
     const response = await this.client.post(`/users/${userId}/avatar`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async uploadBackgroundImage(userId: string, image: any): Promise<{ backgroundImageUrl: string }> {
+    const formData = new FormData();
+    formData.append('background_image', image);
+    const response = await this.client.post(`/users/${userId}/background-image`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -409,7 +419,7 @@ class ApiService {
     const raw: any = await this.deduplicatedGet('/messages/conversations', { user: username });
 
     return (raw || []).map((c: any) => {
-      // Map participants nếu server có
+      // Map participants from server response
       let participants: User[] = (c.participants || []).map((p: any) => mapServerUserToClient({
         id: String(p.id || p.username),
         username: p.username || '',
@@ -458,16 +468,53 @@ class ApiService {
           }
         : undefined;
 
-      // map dm -> user để khớp với type hiện tại ở client
+      // map dm -> user to match client type
       const mappedType: 'event' | 'user' | 'group' =
         c.type === 'group' ? 'group'
         : c.type === 'event' ? 'event'
         : 'user';
 
-      // REBUILD participants cho DM nếu thiếu otherUser:
-      if (mappedType === 'user') {
+      // For DM conversations, use other_participant from server if available
+      if (mappedType === 'user' && c.other_participant) {
+        const otherUser = mapServerUserToClient({
+          id: String(c.other_participant.id || c.other_participant.username),
+          username: c.other_participant.username || '',
+          name: c.other_participant.name || c.other_participant.username || '',
+          email: c.other_participant.email || `${c.other_participant.username}@example.com`,
+          avatar: c.other_participant.avatar || '',
+          country: c.other_participant.country || '',
+          city: c.other_participant.city || '',
+          status: c.other_participant.status || 'Chilling',
+          languages: c.other_participant.languages || [],
+          interests: c.other_participant.interests || [],
+          bio: c.other_participant.bio,
+          gender: c.other_participant.gender,
+          age: c.other_participant.age,
+          flag: c.other_participant.flag,
+          followers: c.other_participant.followers,
+          following: c.other_participant.following,
+          posts: c.other_participant.posts,
+        });
+
+        // Current user
+        const currentUser = mapServerUserToClient({
+          id: username,
+          username,
+          name: username,
+          email: `${username}@example.com`,
+          avatar: '',
+          country: '',
+          city: '',
+          status: 'Chilling',
+          languages: [],
+          interests: [],
+        });
+
+        participants = [currentUser, otherUser];
+      } else if (mappedType === 'user') {
+        // Fallback: rebuild participants for DM if other_participant not available
         const usernames = new Set(participants.map(p => p.username).filter(Boolean));
-        // Thêm currentUser nếu thiếu
+        // Add current user if missing
         if (username && !usernames.has(username)) {
           participants.push(mapServerUserToClient({
             id: username,
@@ -483,7 +530,7 @@ class ApiService {
           }));
           usernames.add(username);
         }
-        // Thêm người còn lại từ lastMessage.sender nếu khác currentUser
+        // Add other user from lastMessage.sender if different from current user
         if (lastMessage?.sender?.username && lastMessage.sender.username !== username && !usernames.has(lastMessage.sender.username)) {
           participants.push(lastMessage.sender);
           usernames.add(lastMessage.sender.username);

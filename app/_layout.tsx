@@ -23,6 +23,7 @@ export default function RootLayout() {
             <Stack.Screen name="auth/login" options={{ headerShown: false }} />
             <Stack.Screen name="auth/signup" options={{ presentation: 'card' }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+           
             <Stack.Screen 
               name="feed/notification" 
               options={{ 
@@ -44,34 +45,34 @@ export default function RootLayout() {
               }} 
             />
             <Stack.Screen 
-              name="account/profile" 
+              name="account /profile" 
               options={{ 
                 presentation: 'card',
               }} 
             />
             <Stack.Screen 
-              name="account/edit-profile" 
+              name="account /edit-profile" 
               options={{ 
                 presentation: 'card',
                 title: 'Edit Profile',
               }} 
             />
             <Stack.Screen 
-              name="account/settings" 
+              name="account /settings" 
               options={{ 
                 presentation: 'card',
                 title: 'Settings',
               }} 
             />
             <Stack.Screen 
-              name="account/payment-pro" 
+              name="account /payment-pro" 
               options={{ 
                 presentation: 'card',
                 title: 'Pro Features',
               }} 
             />
             <Stack.Screen 
-              name="account/followers-list" 
+              name="account /followers-list" 
               options={{ 
                 presentation: 'card',
               }} 

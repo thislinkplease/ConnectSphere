@@ -264,7 +264,7 @@ export default function ConnectionScreen() {
           onPress={() => setViewMode('events')}
         >
           <Text style={[styles.viewModeText, viewMode === 'events' && styles.viewModeTextActive]}>
-            Events
+            All Events
           </Text>
         </TouchableOpacity>
       </View>

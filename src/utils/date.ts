@@ -31,3 +31,18 @@ export const formatTime = (
  * Thực chất dùng cùng logic với formatTime.
  */
 export const formatTimestamp = formatTime;
+
+/**
+ * Định dạng ngày tháng (mặc định 'MMM dd, yyyy').
+ * An toàn với input không hợp lệ: trả chuỗi rỗng nếu không parse được.
+ * Ví dụ: formatDate('2025-11-01T10:00:00Z') => 'Nov 01, 2025'
+ */
+export const formatDate = (
+  date: string | Date | undefined | null,
+  pattern: string = 'MMM dd, yyyy'
+): string => {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
+  return format(dateObj, pattern);
+};

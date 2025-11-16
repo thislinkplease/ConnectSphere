@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, TextInput,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { formatTime } from '@/src/utils/date';
+import { formatDate } from '@/src/utils/date';
 import { useAuth } from '@/src/context/AuthContext';
 import ApiService from '@/src/services/api';
 import ImageService from '@/src/services/image';
@@ -215,7 +215,7 @@ export default function EventDetailScreen() {
               <Ionicons name="calendar-outline" size={20} color="#666" />
               <View style={styles.detailContent}>
                 <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>{formatTime(event.dateStart)}</Text>
+                <Text style={styles.detailValue}>{formatDate(event.dateStart)}</Text>
               </View>
             </View>
 

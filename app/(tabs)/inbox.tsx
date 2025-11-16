@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, RefreshControl, ActivityIndicator, InteractionManager } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { getRelativeTime } from '@/src/utils/date';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import ApiService from '@/src/services/api';
+import WebSocketService from '@/src/services/websocket';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function InboxScreen() {
@@ -17,8 +18,6 @@ export default function InboxScreen() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'events' | 'users'>('all');
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const enrichedConversationsRef = useRef<Set<string>>(new Set());
 
   const loadChats = useCallback(async () => {
     if (!user?.username) return;
@@ -26,8 +25,6 @@ export default function InboxScreen() {
       setLoading(true);
       const data = await ApiService.getConversations(user.username);
       setChats(data);
-      // Reset enrichment tracking when reloading chats
-      enrichedConversationsRef.current = new Set();
     } catch (error) {
       console.error('Error loading chats:', error);
     } finally {
@@ -39,109 +36,145 @@ export default function InboxScreen() {
     loadChats();
   }, [loadChats]);
 
-  // Reload khi quay lại tab Inbox
-  useFocusEffect(
-    useCallback(() => {
-      loadChats();
-    }, [loadChats])
-  );
+  // Note: Removed useFocusEffect reload since WebSocket provides real-time updates
+  // No need to reload when returning to the tab - conversations update automatically
 
-  // Enrich: nếu DM thiếu otherUser hoặc thiếu avatar/name thì fetch full profile
+  // WebSocket real-time updates for new messages
   useEffect(() => {
-    let cancelled = false;
-    const enrichMissing = async () => {
-      if (!user?.username) return;
+    if (!user?.username) return;
+
+    // Handle new messages to update conversation list
+    const handleNewMessage = (message: any) => {
+      const conversationId = String(message.chatId || message.conversation_id || message.conversationId);
+      const senderId = message.senderId || message.sender_username || message.sender?.username;
       
-      // Find conversations that need enrichment and haven't been enriched yet
-      const targets = chats.filter(c => {
-        // Skip if already enriched
-        if (enrichedConversationsRef.current.has(c.id)) return false;
+      setChats(prevChats => {
+        // Find existing conversation
+        const existingIndex = prevChats.findIndex(c => String(c.id) === conversationId);
         
-        if (c.type !== 'user' && c.type !== 'dm') return false;
-        
-        // Check if we have participants
-        if (!c.participants || c.participants.length < 2) return true;
-        
-        // Find the other user in participants
-        const otherUser = c.participants.find(p => p.username && p.username !== user.username);
-        
-        // Need enrichment if no other user found OR other user lacks name/avatar
-        return !otherUser || !otherUser.name || !otherUser.avatar;
-      });
-
-      if (targets.length === 0) return;
-
-      for (const conv of targets) {
-        try {
-          // Mark this conversation as being enriched to avoid duplicate requests
-          enrichedConversationsRef.current.add(conv.id);
+        if (existingIndex >= 0) {
+          // Update existing conversation
+          const updatedChats = [...prevChats];
+          const existingChat = updatedChats[existingIndex];
           
-          // First try to get conversation details
-          const detail = await ApiService.getConversation(conv.id);
-          if (cancelled) return;
-
-          // Find the other user from detailed participants
-          const detailedOtherUser = detail.participants?.find(p => p.username && p.username !== user.username);
+          // Build complete sender info, prioritizing message.sender data
+          let senderInfo = message.sender;
           
-          // If we still don't have complete data, fetch user profile directly
-          let completeOtherUser = detailedOtherUser;
-          if (detailedOtherUser?.username && (!detailedOtherUser.name || !detailedOtherUser.avatar)) {
-            try {
-              completeOtherUser = await ApiService.getUserByUsername(detailedOtherUser.username);
-            } catch {
-              console.warn('Failed to fetch user profile for', detailedOtherUser.username);
+          // If sender info is incomplete, try to find from existing participants
+          if (!senderInfo || !senderInfo.name) {
+            const existingParticipant = existingChat.participants?.find(p => p.username === senderId);
+            if (existingParticipant) {
+              senderInfo = existingParticipant;
             }
           }
-
-          if (cancelled) return;
-
-          // Update the conversation with enriched data
-          setChats(prev =>
-            prev.map(c => {
-              if (c.id !== conv.id) return c;
-              
-              // Build enriched participants list
-              const enrichedParticipants = [...(detail.participants || [])];
-              
-              // Replace the other user with complete data if we have it
-              if (completeOtherUser) {
-                const idx = enrichedParticipants.findIndex(p => p.username === completeOtherUser?.username);
-                if (idx >= 0) {
-                  enrichedParticipants[idx] = completeOtherUser;
-                } else {
-                  enrichedParticipants.push(completeOtherUser);
-                }
-              }
-
-              return {
-                ...c,
-                participants: enrichedParticipants.length > 0 ? enrichedParticipants : c.participants,
-              };
-            })
-          );
-        } catch (e) {
-          console.warn('Failed to enrich conversation', conv.id, e);
-          // Keep it marked as enriched to avoid infinite retries
+          
+          // Ensure we have complete sender info with all required fields
+          if (!senderInfo || !senderInfo.username) {
+            senderInfo = {
+              id: senderId,
+              username: senderId,
+              name: senderId,
+              email: `${senderId}@example.com`,
+              avatar: '',
+              country: '',
+              city: '',
+              status: 'Chilling',
+              languages: [],
+              interests: [],
+            };
+          } else {
+            // Merge to ensure all fields exist
+            senderInfo = {
+              id: senderInfo.id || senderId,
+              username: senderInfo.username || senderId,
+              name: senderInfo.name || senderInfo.username || senderId,
+              email: senderInfo.email || `${senderId}@example.com`,
+              avatar: senderInfo.avatar || '',
+              country: senderInfo.country || '',
+              city: senderInfo.city || '',
+              status: senderInfo.status || 'Chilling',
+              languages: senderInfo.languages || [],
+              interests: senderInfo.interests || [],
+              bio: senderInfo.bio,
+              gender: senderInfo.gender,
+              age: senderInfo.age,
+              flag: senderInfo.flag,
+              followersCount: senderInfo.followersCount,
+              followingCount: senderInfo.followingCount,
+              postsCount: senderInfo.postsCount,
+              isOnline: senderInfo.isOnline,
+            };
+          }
+          
+          // Update participants if sender is not in the list (for DM conversations)
+          let updatedParticipants = existingChat.participants || [];
+          if (existingChat.type === 'user' || existingChat.type === 'dm') {
+            // Ensure both current user and sender are in participants
+            const hasCurrentUser = updatedParticipants.some(p => p.username === user.username);
+            const hasSender = updatedParticipants.some(p => p.username === senderId);
+            
+            if (!hasCurrentUser) {
+              updatedParticipants.push({
+                id: user.id || user.username || '',
+                username: user.username || '',
+                name: user.name || user.username || '',
+                email: user.email || `${user.username}@example.com`,
+                avatar: user.avatar || '',
+                country: user.country || '',
+                city: user.city || '',
+                status: user.status || 'Chilling',
+                languages: user.languages || [],
+                interests: user.interests || [],
+              });
+            }
+            
+            if (!hasSender && senderId !== user.username) {
+              updatedParticipants.push(senderInfo);
+            } else if (hasSender && senderId !== user.username) {
+              // Update existing participant with fresh data
+              updatedParticipants = updatedParticipants.map(p => 
+                p.username === senderId ? senderInfo : p
+              );
+            }
+          }
+          
+          // Move to top and update last message
+          updatedChats.splice(existingIndex, 1);
+          updatedChats.unshift({
+            ...existingChat,
+            participants: updatedParticipants,
+            lastMessage: {
+              id: String(message.id || Date.now()),
+              chatId: conversationId,
+              senderId: senderId,
+              sender: senderInfo,
+              content: message.content || '',
+              timestamp: message.timestamp || message.created_at || new Date().toISOString(),
+              read: false,
+            },
+            // Increment unread count if message is from someone else
+            unreadCount: senderId !== user.username 
+              ? (existingChat.unreadCount || 0) + 1 
+              : existingChat.unreadCount,
+          });
+          
+          return updatedChats;
+        } else {
+          // New conversation - reload the full list to get complete data
+          loadChats();
+          return prevChats;
         }
-      }
+      });
     };
-    
-    InteractionManager.runAfterInteractions(enrichMissing);
-    return () => { cancelled = true; };
-  }, [chats, user?.username]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadChats();
-    setRefreshing(false);
-  }, [loadChats]);
+    // Listen to new messages
+    WebSocketService.onNewMessage(handleNewMessage);
 
-  const filteredChats = chats.filter(chat => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'events') return chat.type === 'event';
-    if (activeTab === 'users') return chat.type === 'user';
-    return true;
-  });
+    return () => {
+      // Clean up listener
+      WebSocketService.off('new_message', handleNewMessage);
+    };
+  }, [user?.username, user, loadChats]);
 
   const handleOpenChat = useCallback(async (chat: Chat) => {
     try {
@@ -156,30 +189,35 @@ export default function InboxScreen() {
     }
   }, [router, user?.username]);
 
+  const filteredChats = chats.filter(chat => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'events') return chat.type === 'event';
+    if (activeTab === 'users') return chat.type === 'user';
+    return true;
+  });
+
   const renderChatItem = ({ item }: { item: Chat }) => {
     const isDM = item.type === 'dm' || item.type === 'user';
 
-    // 1) ưu tiên participants khác mình
+    // Find the other user in participants (not the current user)
     let otherUser = isDM
       ? item.participants?.find(p => p.username && p.username !== user?.username)
       : undefined;
 
-    // 2) fallback dùng sender nếu KHÁC mình
-    const sender = item.lastMessage?.sender;
-    if (!otherUser && sender?.username && sender.username !== user?.username) {
-      otherUser = sender;
+    // If otherUser not found in participants, try to get from lastMessage sender
+    if (isDM && !otherUser && item.lastMessage?.sender) {
+      const sender = item.lastMessage.sender;
+      if (sender.username !== user?.username) {
+        otherUser = sender;
+      }
     }
 
-    // 3) fallback cuối: lấy bất kỳ participant nào khác mình
-    if (!otherUser && item.participants && item.participants.length) {
-      const first = item.participants.find(p => p.username !== user?.username);
-      if (first) otherUser = first;
-    }
-
+    // Build robust display name - prioritize actual name over username
     const displayName = isDM
-      ? (otherUser?.name || otherUser?.username || 'Direct Message')
-      : (item.name || 'Group');
+      ? (otherUser?.name || otherUser?.username || 'Unknown User')
+      : (item.name || 'Group Chat');
 
+    // Get avatar - ensure we use the other user's avatar for DM
     const avatarUrl = isDM ? (otherUser?.avatar || '') : '';
 
     const relativeTime = item.lastMessage?.timestamp
@@ -272,7 +310,7 @@ export default function InboxScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading && !refreshing ? (
+      {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -281,9 +319,6 @@ export default function InboxScreen() {
           data={filteredChats}
           renderItem={renderChatItem}
           keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />

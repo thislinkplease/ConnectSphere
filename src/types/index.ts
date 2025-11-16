@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  backgroundImage?: string; // Background image for Tinder-like hangout cards
   country: string;
   city: string;
   flag?: string;
