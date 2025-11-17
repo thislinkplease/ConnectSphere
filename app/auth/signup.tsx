@@ -15,6 +15,8 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [country, setCountry] = useState('');
   const [city, setCity] = useState('');
+  // Gender defaults to Male - UI to select gender is not yet implemented
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

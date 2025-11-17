@@ -10,12 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.connectsphere.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs your location to show nearby events and users.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs your location to show nearby events and users."
       }
     },
     "android": {
+      "package": "com.connectsphere.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

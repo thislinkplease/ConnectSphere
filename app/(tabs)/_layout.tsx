@@ -5,22 +5,25 @@ import { HapticTab } from '@/components/haptic-tab';
 import { Home, UserRound, Compass, MessageCircleMore, Users } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { WebSocketStatus } from '@/components/WebSocketStatus';
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
 
     return (
-        <Tabs
-            screenOptions={{
-                tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-                headerShown: false,
-                tabBarButton: HapticTab,
-                tabBarStyle: {
-                    height: 105,
-                    paddingTop: 20,
-                },
-            }}
-        >
+        <>
+            <WebSocketStatus />
+            <Tabs
+                screenOptions={{
+                    tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+                    headerShown: false,
+                    tabBarButton: HapticTab,
+                    tabBarStyle: {
+                        height: 105,
+                        paddingTop: 20,
+                    },
+                }}
+            >
             <Tabs.Screen
                 name="discussion"
                 options={{
@@ -97,6 +100,7 @@ export default function TabLayout() {
                 }}
             />
         </Tabs>
+        </>
     );
 }
 

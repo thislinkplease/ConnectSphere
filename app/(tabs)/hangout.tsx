@@ -37,6 +37,10 @@ export default function HangoutScreen() {
   const [isAvailable, setIsAvailable] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   
+  // Use refs to store current state for panResponder closure
+  const usersRef = useRef<User[]>([]);
+  const currentIndexRef = useRef(0);
+  
   const position = useRef(new Animated.ValueXY()).current;
   const panResponder = useRef(
     PanResponder.create({
@@ -45,43 +49,80 @@ export default function HangoutScreen() {
         position.setValue({ x: gesture.dx, y: gesture.dy });
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx < -SWIPE_THRESHOLD) {
-          // Swipe left - view profile
-          forceSwipe('left');
-        } else if (gesture.dx > SWIPE_THRESHOLD) {
-          // Swipe right - next user
-          forceSwipe('right');
-        } else {
-          resetPosition();
-        }
-      },
+      if (gesture.dx < -SWIPE_THRESHOLD) {
+        // Swipe left - next user
+        forceSwipe('left');
+      } else if (gesture.dx > SWIPE_THRESHOLD) {
+        // Swipe right - view profile
+        forceSwipe('right');
+      } else {
+        resetPosition();
+      }
+    },
     })
   ).current;
 
   // Load online users available for hangout
   const loadOnlineUsers = useCallback(async () => {
-    if (!currentUser?.username) return;
+    if (!currentUser?.username) {
+      
+      return;
+    }
     
     try {
       setLoading(true);
+    
+      
       // Get users available for hangout
       const hangoutData = await ApiService.getOpenHangouts({
         limit: 50,
       });
       
+      
+      
+      // Debug: Log first user to see structure
+      if (hangoutData.length > 0) {
+      
+      }
+      
       // Filter to only show online users and exclude current user
-      const onlineUsers = hangoutData
-        .map((h: any) => h.user || h)
-        .filter((u: User) => 
-          u.isOnline && 
-          u.username !== currentUser.username
-        );
+      // The server already filters for is_available and is_online
+      // ALSO filter out any users without a username (data integrity check)
+      const onlineUsers = hangoutData.filter((u: User) => {
+        // Skip users without username
+        if (!u.username) {
+         
+          return false;
+        }
+        
+        // Skip current user
+        const isNotCurrentUser = u.username !== currentUser.username;
+        if (!isNotCurrentUser) {
+    
+          return false;
+        }
+        
+        return true;
+      });
+      
+      // Debug: Log filtered users
+   
+      if (onlineUsers.length > 0) {
+        
+      }
       
       setUsers(onlineUsers);
       setCurrentIndex(0);
-    } catch (error) {
-      console.error('Error loading online users:', error);
+      // Update refs for panResponder closure
+      usersRef.current = onlineUsers;
+      currentIndexRef.current = 0;
+    } catch (err) {
+    
+      Alert.alert('Error', 'Failed to load users. Please try again.');
       setUsers([]);
+      // Update refs for panResponder closure
+      usersRef.current = [];
+      currentIndexRef.current = 0;
     } finally {
       setLoading(false);
     }
@@ -95,7 +136,7 @@ export default function HangoutScreen() {
       const status = await ApiService.getHangoutStatus(currentUser.username);
       setIsAvailable(status.is_available || false);
     } catch (error) {
-      console.error('Error loading hangout status:', error);
+    
       setIsAvailable(false);
     }
   }, [currentUser?.username]);
@@ -129,7 +170,7 @@ export default function HangoutScreen() {
         loadOnlineUsers();
       }
     } catch (error) {
-      console.error('Error updating hangout status:', error);
+
       Alert.alert('Error', 'Failed to update hangout status. Please try again.');
     } finally {
       setUpdatingStatus(false);
@@ -137,13 +178,77 @@ export default function HangoutScreen() {
   }, [currentUser, isAvailable, updatingStatus, loadOnlineUsers]);
 
   useEffect(() => {
-    loadHangoutStatus();
+    // Auto-enable hangout visibility on first visit
+    const initializeHangoutVisibility = async () => {
+      if (!currentUser?.username) return;
+      
+      try {
+       
+        const status = await ApiService.getHangoutStatus(currentUser.username);
+        
+
+        
+        // Set the current visibility state
+        setIsAvailable(status.is_available || false);
+        
+        // If user has never set status before OR is not available, suggest enabling
+        if (!status.is_available) {
+  
+          
+          // Don't auto-enable, let user decide but show a helpful message
+          setTimeout(() => {
+            Alert.alert(
+              'Enable Hangout Visibility? 👋',
+              'Turn on visibility to discover other users nearby and let them see you! You can toggle this anytime.',
+              [
+                { text: 'Not Now', style: 'cancel' },
+                {
+                  text: 'Enable',
+                  onPress: async () => {
+                    if (!currentUser?.username) {
+                      Alert.alert('Error', 'User not found');
+                      return;
+                    }
+                    try {
+                      await ApiService.updateHangoutStatus(
+                        currentUser.username,        // đã thu hẹp
+                        true,
+                        currentUser.currentActivity || '',          // fallback chuỗi rỗng
+                        currentUser.hangoutActivities || []         // fallback mảng rỗng
+                      );
+                      setIsAvailable(true);
+                      loadOnlineUsers(); // Reload to see available users
+                    } catch (error) {
+                      
+                    }
+                  },
+                },
+              ]
+            );
+          }, 1000); // Delay to avoid showing immediately
+        }
+      } catch (error) {
+
+      }
+    };
+    
+    initializeHangoutVisibility();
     loadOnlineUsers();
-  }, [loadHangoutStatus, loadOnlineUsers]);
+    
+    // Set up periodic refresh every 30 seconds to get latest available users
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.username, loadOnlineUsers]);
+
+  // Sync refs whenever state changes
+  useEffect(() => {
+    usersRef.current = users;
+    currentIndexRef.current = currentIndex;
+  }, [users, currentIndex]);
 
   // Reload when coming back to this screen
   useFocusEffect(
     useCallback(() => {
+   
       loadHangoutStatus();
       loadOnlineUsers();
     }, [loadHangoutStatus, loadOnlineUsers])
@@ -159,16 +264,38 @@ export default function HangoutScreen() {
   };
 
   const onSwipeComplete = (direction: 'left' | 'right') => {
-    const currentUserProfile = users[currentIndex];
+    // Use refs to get the most current state
+    const currentUserProfile = usersRef.current[currentIndexRef.current];
     
-    if (direction === 'left' && currentUserProfile?.username) {
-      // Swipe left - view profile
-      router.push(`/account/profile?username=${currentUserProfile.username}`);
+    // Debug logging
+
+
+    if (direction === 'right') {
+      // Swipe right: Navigate to profile
+      if (currentUserProfile?.username) {
+      
+        router.push(`/account/profile?username=${currentUserProfile.username}`);
+      } else {
+
+        // Show user-friendly error
+        Alert.alert(
+          'Profile Unavailable',
+          'This user\'s profile is temporarily unavailable. Please try the next user.',
+          [{ text: 'OK' }]
+        );
+      }
+      // Reset position but DON'T increment index - user can come back to same card
+      position.setValue({ x: 0, y: 0 });
+    } else {
+      // Swipe left: Skip to next card
+
+      position.setValue({ x: 0, y: 0 });
+      setCurrentIndex(prevIndex => {
+        const newIndex = prevIndex + 1;
+        currentIndexRef.current = newIndex; // Update ref
+        return newIndex;
+      });
     }
-    
-    // Move to next user (for both left and right swipes)
-    position.setValue({ x: 0, y: 0 });
-    setCurrentIndex(prevIndex => prevIndex + 1);
   };
 
   const resetPosition = () => {
@@ -179,16 +306,25 @@ export default function HangoutScreen() {
   };
 
   const handleUploadBackground = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'Please log in to upload background image');
+      return;
+    }
     
     try {
+
       const image = await ImageService.pickImageFromGallery({
         allowsEditing: true,
-        aspect: [9, 16],
+        aspect: [9, 16], // Portrait aspect ratio for hangout cards
         quality: 0.8,
       });
       
-      if (!image) return;
+      if (!image) {
+  
+        return;
+      }
+
+    
 
       if (!ImageService.validateImageSize(image, 10)) {
         Alert.alert('Error', 'Image size must be less than 10MB');
@@ -200,17 +336,31 @@ export default function HangoutScreen() {
       const imageFile: any = {
         uri: image.uri,
         type: image.type || 'image/jpeg',
-        name: image.name || 'background.jpg',
+        name: image.name || `background_${Date.now()}.jpg`,
       };
 
+   
+ 
       // Upload background image
-      await ApiService.uploadBackgroundImage(currentUser.id, imageFile);
-      Alert.alert('Success', 'Background image uploaded successfully! It will be visible to others in Hangout.');
+      const result = await ApiService.uploadBackgroundImage(currentUser.id, imageFile);
       
-      setUploadingBackground(false);
+     
+      
+      Alert.alert(
+        'Success', 
+        'Background image uploaded successfully! It will be visible to others in Hangout when you turn on visibility.'
+      );
+      
+      // Refresh user data to get new background image
+      if (currentUser.username) {
+        const updatedUser = await ApiService.getUserByUsername(currentUser.username);
+     
+      }
+      
     } catch (error) {
-      console.error('Error uploading background:', error);
+
       Alert.alert('Error', 'Failed to upload background image. Please try again.');
+    } finally {
       setUploadingBackground(false);
     }
   };
@@ -255,12 +405,18 @@ export default function HangoutScreen() {
               source={{ uri: user.backgroundImage }}
               style={styles.cardImage}
               resizeMode="cover"
+              onError={(e) => {
+   
+              }}
             />
           ) : user.avatar ? (
             <Image
               source={{ uri: user.avatar }}
               style={styles.cardImage}
               resizeMode="cover"
+              onError={(e) => {
+              
+              }}
             />
           ) : (
             <View style={[styles.cardImage, { backgroundColor: colors.border }]}>
@@ -329,36 +485,36 @@ export default function HangoutScreen() {
 
           {/* Swipe Indicators */}
           <Animated.View
-            style={[
-              styles.swipeIndicator,
-              styles.likeIndicator,
-              {
-                opacity: position.x.interpolate({
-                  inputRange: [0, SWIPE_THRESHOLD / 2],
-                  outputRange: [0, 1],
-                  extrapolate: 'clamp',
-                }),
-              },
-            ]}
-          >
-            <Text style={styles.swipeIndicatorText}>NEXT</Text>
-          </Animated.View>
+  style={[
+    styles.swipeIndicator,
+    styles.likeIndicator,
+    {
+      opacity: position.x.interpolate({
+        inputRange: [0, SWIPE_THRESHOLD / 2],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+      }),
+    },
+  ]}
+>
+  <Text style={styles.swipeIndicatorText}>PROFILE</Text>
+</Animated.View>
 
           <Animated.View
-            style={[
-              styles.swipeIndicator,
-              styles.nopeIndicator,
-              {
-                opacity: position.x.interpolate({
-                  inputRange: [-SWIPE_THRESHOLD / 2, 0],
-                  outputRange: [1, 0],
-                  extrapolate: 'clamp',
-                }),
-              },
-            ]}
-          >
-            <Text style={styles.swipeIndicatorText}>PROFILE</Text>
-          </Animated.View>
+  style={[
+    styles.swipeIndicator,
+    styles.nopeIndicator,
+    {
+      opacity: position.x.interpolate({
+        inputRange: [-SWIPE_THRESHOLD / 2, 0],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+      }),
+    },
+  ]}
+>
+  <Text style={styles.swipeIndicatorText}>NEXT</Text>
+</Animated.View>
         </Animated.View>
       );
     }
@@ -404,12 +560,31 @@ export default function HangoutScreen() {
     return (
       <View style={styles.noMoreCards}>
         <Ionicons name="people-outline" size={80} color="#ccc" />
-        <Text style={styles.noMoreCardsText}>No more users online</Text>
-        <Text style={styles.noMoreCardsSubtext}>
-          Check back later or try adjusting your filters
+        <Text style={styles.noMoreCardsText}>
+          {isAvailable ? 'No more users available' : 'Turn on visibility to see others'}
         </Text>
+        <Text style={styles.noMoreCardsSubtext}>
+          {isAvailable 
+            ? 'Check back later or invite friends to join' 
+            : 'You need to be visible to discover other users nearby'}
+        </Text>
+        {!isAvailable && (
+          <TouchableOpacity
+            style={[styles.reloadButton, { backgroundColor: colors.primary, marginTop: 16 }]}
+            onPress={toggleHangoutStatus}
+          >
+            <Ionicons name="eye" size={20} color="#fff" />
+            <Text style={styles.reloadButtonText}>Turn On Visibility</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
-          style={[styles.reloadButton, { backgroundColor: colors.primary }]}
+          style={[
+            styles.reloadButton, 
+            { 
+              backgroundColor: isAvailable ? colors.primary : colors.border,
+              marginTop: 12,
+            }
+          ]}
           onPress={loadOnlineUsers}
         >
           <Ionicons name="refresh" size={20} color="#fff" />
@@ -439,7 +614,7 @@ export default function HangoutScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={styles.headerTitle}>Hang Out</Text>
+
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[
@@ -495,30 +670,13 @@ export default function HangoutScreen() {
         )}
       </View>
 
-      {/* Action Buttons */}
-      {currentIndex < users.length && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.nopeButton]}
-            onPress={() => forceSwipe('left')}
-          >
-            <Ionicons name="close" size={32} color="#FF6B6B" />
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.likeButton]}
-            onPress={() => forceSwipe('right')}
-          >
-            <Ionicons name="checkmark" size={32} color="#4ECDC4" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Instructions */}
       {users.length > 0 && currentIndex < users.length && (
         <View style={styles.instructions}>
           <Text style={styles.instructionsText}>
-            ✕ View profile • ✓ Next user
+            Next user • View profile
           </Text>
         </View>
       )}
@@ -541,6 +699,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   headerRight: {
     flexDirection: 'row',

@@ -29,12 +29,15 @@ const REQUEST_CACHE_DURATION = 1000; // 1 second cache for pending requests
 function mapServerUserToClient(serverUser: any): User {
   return {
     ...serverUser,
-    // Map server field names to client field names
+    // Map snake_case -> camelCase
     backgroundImage: serverUser.background_image ?? serverUser.backgroundImage,
     followersCount: serverUser.followers ?? serverUser.followersCount ?? 0,
     followingCount: serverUser.following ?? serverUser.followingCount ?? 0,
     postsCount: serverUser.posts ?? serverUser.postsCount ?? 0,
     isPro: serverUser.is_premium ?? serverUser.isPro ?? false,
+
+    // IMPORTANT: map online status
+    isOnline: serverUser.is_online ?? serverUser.isOnline ?? false,
   };
 }
 
@@ -53,7 +56,7 @@ class ApiService {
     // Add request interceptor for logging and deduplication
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    
         return config;
       },
       (error) => {
@@ -87,7 +90,7 @@ class ApiService {
           if (!originalRequest._retry) {
             originalRequest._retry = true;
             try {
-              console.log('Retrying request...');
+     
               return this.client(originalRequest);
             } catch (retryError) {
               console.error('Retry failed:', retryError);
@@ -119,7 +122,7 @@ class ApiService {
     // Check if there's a pending request for the same endpoint
     const pending = pendingRequests.get(cacheKey);
     if (pending && (now - pending.timestamp) < REQUEST_CACHE_DURATION) {
-      console.log(`Deduplicating request: ${url}`);
+ 
       return pending.promise;
     }
     
@@ -382,14 +385,35 @@ class ApiService {
     user_lat?: number;
     user_lng?: number;
     limit?: number;
-  }): Promise<any[]> {
-    return this.deduplicatedGet(`/hangouts`, {
+  }): Promise<User[]> {
+    const users = await this.deduplicatedGet(`/hangouts`, {
       languages: params?.languages?.join(","),
       distance_km: params?.distance_km,
       user_lat: params?.user_lat,
       user_lng: params?.user_lng,
       limit: params?.limit,
     });
+    
+    // Map server user data to client format, ensuring we have an array
+    if (!users || !Array.isArray(users)) {
+      console.warn('getOpenHangouts: Invalid response, expected array:', users);
+      return [];
+    }
+    
+    // Debug: Log raw server response
+   
+    if (users.length > 0) {
+
+    }
+    
+    const mappedUsers = users.map((user: any) => mapServerUserToClient(user));
+    
+    // Debug: Log mapped response
+    if (mappedUsers.length > 0) {
+     
+    }
+    
+    return mappedUsers;
   }
 
   async getMyHangouts(username: string): Promise<any[]> {
@@ -577,24 +601,33 @@ class ApiService {
     };
   }
 
-async getChatMessages(conversationId: string): Promise<Message[]> {
-  const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
-  return response.data.map((m: any) => ({
-    id: String(m.id),
-    chatId: String(m.chatId),
-    senderId: m.senderId,
-    sender: {
-      id: m.sender?.id,
-      username: m.sender?.username,
-      name: m.sender?.name,
-      avatar: m.sender?.avatar,
-    },
-    content: m.content,
-    image: m.image,
-    timestamp: m.timestamp,
-    read: m.read ?? false,
-  }));
-}
+ async getChatMessages(conversationId: string): Promise<Message[]> {
+   const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
+   return response.data.map((m: any) => ({
+     id: String(m.id),
+     chatId: String(m.conversation_id ?? conversationId),
+     senderId: m.sender_username ?? m.sender?.username,
+     sender: mapServerUserToClient({
+       id: m.sender?.id ?? m.sender_username,
+       username: m.sender?.username ?? m.sender_username,
+       name: m.sender?.name ?? m.sender_username,
+       email: m.sender?.email ?? `${m.sender_username}@example.com`,
+       avatar: m.sender?.avatar ?? '',
+       country: m.sender?.country ?? '',
+       city: m.sender?.city ?? '',
+       status: m.sender?.status ?? 'Chilling',
+       languages: m.sender?.languages ?? [],
+       interests: m.sender?.interests ?? [],
+       bio: m.sender?.bio,
+       gender: m.sender?.gender,
+       age: m.sender?.age,
+     }),
+     content: m.content ?? '',
+     image: m.message_media?.[0]?.media_url ?? m.image,
+     timestamp: m.created_at ?? m.timestamp,
+     read: m.is_read ?? m.read ?? false,
+   }));
+ }
 
   async sendMessage(conversationId: string, senderUsername: string, content: string, replyToMessageId?: string): Promise<void> {
     await this.client.post(`/messages/conversations/${conversationId}/messages`, {
@@ -662,8 +695,21 @@ async getChatMessages(conversationId: string): Promise<Message[]> {
   }
 
   // Pro subscription endpoints
-  async activateProSubscription(username: string): Promise<void> {
-    await this.client.post('/payments/subscribe', { username, plan_type: 'pro' });
+  async createPaymentIntent(username: string, amount: number = 1): Promise<{ clientSecret: string; paymentIntentId: string }> {
+    const response = await this.client.post('/payments/create-payment-intent', { 
+      username, 
+      amount 
+    });
+    return response.data;
+  }
+
+  async activateProSubscription(username: string, paymentIntentId?: string): Promise<void> {
+    await this.client.post('/payments/subscribe', { 
+      username, 
+      plan_type: 'pro',
+      payment_method: paymentIntentId ? 'stripe' : 'test',
+      payment_intent_id: paymentIntentId
+    });
   }
 
   async deactivateProSubscription(username: string): Promise<void> {

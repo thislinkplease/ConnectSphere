@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { User, AuthState } from '../types';
 import ApiService from '../services/api';
 import WebSocketService from '../services/websocket';
@@ -30,6 +31,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  // Keep WebSocket connected when app comes to foreground
+  useEffect(() => {
+    if (!authState.isAuthenticated || !authState.token) {
+      return;
+    }
+
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        // App came to foreground - ensure WebSocket is connected
+        console.log('📱 App came to foreground - checking WebSocket connection');
+        if (!WebSocketService.isConnected()) {
+          const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+          WebSocketService.connect(apiUrl, authState.token || '');
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [authState.isAuthenticated, authState.token]);
 
   const loadStoredAuth = async () => {
     try {

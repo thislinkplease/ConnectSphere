@@ -4,17 +4,25 @@ import { Message } from '../types';
 class WebSocketService {
   private socket: Socket | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = Infinity; // Infinite reconnection attempts
   private reconnectDelay = 1000;
   private isConnecting = false;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null; // FIXED
+  private connectionStatusListeners: ((connected: boolean) => void)[] = [];
+  private activeConversations: Set<string> = new Set(); // Track active conversation rooms
 
   connect(url: string, token?: string) {
-    if (this.socket?.connected || this.isConnecting) {
-      console.log('WebSocket already connected or connecting');
+    if (this.socket?.connected) {
+    
       return;
     }
 
-    console.log('Connecting to WebSocket:', url);
+    if (this.isConnecting) {
+    
+      return;
+    }
+
+
     this.isConnecting = true;
 
     this.socket = io(url, {
@@ -25,46 +33,118 @@ class WebSocketService {
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: this.reconnectDelay,
+      reconnectionDelayMax: 5000,
       timeout: 10000,
+      autoConnect: true,
+      forceNew: false, // Reuse existing connection if available
     });
 
     this.socket.on('connect', () => {
-      console.log('WebSocket connected successfully');
+  
       this.reconnectAttempts = 0;
       this.isConnecting = false;
+      this.startHeartbeat();
+      
+      // Rejoin all active conversation rooms
+      if (this.activeConversations.size > 0) {
+       
+        this.activeConversations.forEach(conversationId => {
+          this.socket?.emit('join_conversation', { conversationId });
+        });
+      }
+      
+      this.notifyConnectionStatus(true);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
+    
       this.isConnecting = false;
+      this.stopHeartbeat();
+      this.notifyConnectionStatus(false);
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error.message);
+ 
       this.reconnectAttempts++;
       this.isConnecting = false;
+      this.notifyConnectionStatus(false);
+    });
+
+    // Listen for heartbeat from server
+    this.socket.on('heartbeat', () => {
+      // Acknowledge heartbeat to keep connection alive
+      this.socket?.emit('heartbeat_ack');
+    });
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    // Send heartbeat every 25 seconds (server expects response within 30s)
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket?.connected) {
+        this.socket.emit('heartbeat_ack');
+      }
+    }, 25000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private notifyConnectionStatus(connected: boolean) {
+    this.connectionStatusListeners.forEach(listener => {
+      try {
+        listener(connected);
+      } catch (error) {
       
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('Max reconnection attempts reached');
-        this.disconnect();
       }
     });
   }
 
+  onConnectionStatusChange(callback: (connected: boolean) => void) {
+    this.connectionStatusListeners.push(callback);
+    // Immediately call with current status
+    callback(this.isConnected());
+  }
+
+  offConnectionStatusChange(callback: (connected: boolean) => void) {
+    const index = this.connectionStatusListeners.indexOf(callback);
+    if (index > -1) {
+      this.connectionStatusListeners.splice(index, 1);
+    }
+  }
+
   disconnect() {
     if (this.socket) {
-      console.log('Disconnecting WebSocket');
+
+      this.stopHeartbeat();
       this.socket.disconnect();
       this.socket = null;
     }
     this.isConnecting = false;
     this.reconnectAttempts = 0;
+    this.activeConversations.clear(); // Clear tracked conversations on disconnect
+    this.notifyConnectionStatus(false);
+  }
+
+  // Force reconnection
+  forceReconnect() {
+ 
+    if (this.socket && !this.socket.connected) {
+      this.socket.connect();
+    }
   }
 
   // Join a conversation room
   joinConversation(conversationId: string) {
     if (this.socket) {
       this.socket.emit('join_conversation', { conversationId });
+      // Track this conversation so we can rejoin on reconnection
+      this.activeConversations.add(conversationId);
+  
     }
   }
 
@@ -72,6 +152,9 @@ class WebSocketService {
   leaveConversation(conversationId: string) {
     if (this.socket) {
       this.socket.emit('leave_conversation', { conversationId });
+      // Remove from active conversations
+      this.activeConversations.delete(conversationId);
+ 
     }
   }
 
@@ -86,7 +169,7 @@ class WebSocketService {
       });
       return true;
     } else {
-      console.warn('WebSocket not connected, cannot send message');
+  
       return false;
     }
   }
