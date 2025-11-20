@@ -42,10 +42,33 @@ export default function SignupScreen() {
     setIsLoading(true);
     try {
       await signup(username, name, email, password, country, city, gender);
-      // Navigation will be handled automatically by auth state change
-    } catch (error) {
-      Alert.alert('Signup Failed', 'Unable to create account. Please try again.');
+      
+      // Show success message and redirect to login
+      Alert.alert(
+        'Success!', 
+        'Your account has been created successfully. Please sign in to continue.',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => router.replace('/auth/login')
+          }
+        ]
+      );
+    } catch (error: any) {
       console.error('Signup error:', error);
+      
+      // Show specific error message
+      let errorMessage = 'Unable to create account. Please try again.';
+      
+      if (error?.response?.status === 409) {
+        errorMessage = 'Email already registered. Please use a different email or sign in.';
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Signup Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }

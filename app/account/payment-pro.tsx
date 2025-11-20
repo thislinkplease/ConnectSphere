@@ -323,6 +323,19 @@ export default function PaymentProScreen() {
 
             <View style={styles.featureItem}>
               <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Ionicons name="chatbubbles" size={24} color={colors.primary} />
+              </View>
+              <View style={styles.featureContent}>
+                <Text style={styles.featureTitle}>Create Communities</Text>
+                <Text style={styles.featureDescription}>
+                  Create and manage your own communities with group chat
+                </Text>
+              </View>
+              {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
+            </View>
+
+            <View style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
                 <Ionicons name="flash" size={24} color={colors.primary} />
               </View>
               <View style={styles.featureContent}>

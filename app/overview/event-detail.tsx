@@ -328,12 +328,11 @@ export default function EventDetailScreen() {
             {event.comments && event.comments.length > 0 ? (
               event.comments.map((commentItem) => (
                 <View key={commentItem.id} style={styles.commentItem}>
-                  <Image 
-                    source={{ uri: commentItem.user.avatar }} 
-                    style={styles.commentAvatar} 
-                  />
+                  <View style={styles.commentAvatar}>
+                    <Ionicons name="person-circle-outline" size={40} color="#999" />
+                  </View>
                   <View style={styles.commentContent}>
-                    <Text style={styles.commentAuthor}>{commentItem.user.name}</Text>
+                    <Text style={styles.commentAuthor}>{commentItem.author_username}</Text>
                     <Text style={styles.commentText}>{commentItem.content}</Text>
                   </View>
                 </View>
@@ -506,6 +505,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   commentInputWrapper: {
     flex: 1,

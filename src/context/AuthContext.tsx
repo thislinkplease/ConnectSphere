@@ -133,7 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (username: string, name: string, email: string, password: string, country: string, city: string, gender?: 'Male' | 'Female' | 'Other') => {
     try {
-      const { user, token } = await ApiService.signup({
+      // Just call the signup API without auto-login
+      // User will need to login manually after signup
+      await ApiService.signup({
         username,
         name,
         email,
@@ -143,32 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         gender,
       });
       
-      // Check Pro status from server (new users typically won't be Pro, but check anyway)
-      try {
-        if (user.username) {
-          const proStatus = await ApiService.getProStatus(user.username);
-          user.isPro = proStatus.isPro;
-        }
-      } catch (proError) {
-        console.error('Error loading pro status:', proError);
-        // Continue without Pro status
-      }
-      
-      // Store auth data
-      await AsyncStorage.setItem(TOKEN_KEY, token);
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
-      
-      ApiService.setAuthToken(token);
-      
-      // Initialize WebSocket connection
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-      WebSocketService.connect(apiUrl, token);
-      
-      setAuthState({
-        isAuthenticated: true,
-        user,
-        token,
-      });
+      // Don't auto-login after signup
+      // User should be redirected to login screen to verify their credentials
     } catch (error) {
       console.error('Signup error:', error);
       throw error;

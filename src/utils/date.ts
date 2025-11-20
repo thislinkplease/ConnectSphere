@@ -9,6 +9,16 @@ import {
 } from 'date-fns';
 
 /**
+ * Format a count number with K/M suffixes
+ * Examples: 1234 => "1K", 1500000 => "1M"
+ */
+export const formatCount = (n = 0): string => {
+  if (n >= 1_000_000) return `${Math.floor(n / 1_000_000)}M`;
+  if (n >= 1_000) return `${Math.floor(n / 1_000)}K`;
+  return `${n}`;
+};
+
+/**
  * Trả về chuỗi thời gian tương đối (vd: "5 minutes ago").
  * An toàn với input không hợp lệ: trả chuỗi rỗng nếu không parse được.
  */
@@ -17,6 +27,36 @@ export const getRelativeTime = (date: string | Date | undefined | null): string 
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
   if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
   return formatDistanceFns(dateObj, new Date(), { addSuffix: true });
+};
+
+/**
+ * Format time relative to now, similar to Vietnam timezone formatting
+ * Examples: "just now", "5 mins ago", "2 hours ago", "3 days ago"
+ */
+export const formatToVietnamTime = (input: string | Date | undefined | null): string => {
+  if (!input) return '';
+  
+  try {
+    const d = typeof input === 'string' ? new Date(input) : input;
+    if (Number.isNaN(d.getTime())) return '';
+    
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} mins ago`;
+    
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hours ago`;
+    
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days} days ago`;
+    
+    // For dates older than a week, use formatted date
+    return format(d, 'MMM d, yyyy');
+  } catch {
+    return '';
+  }
 };
 
 /**

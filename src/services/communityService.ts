@@ -16,6 +16,7 @@ export type CommunityPost = Post & {
 export interface CommunityPostsParams {
   limit?: number;
   before?: string; // ISO string cursor (created_at của bài cuối)
+  viewer?: string; // username of viewer for private community access check
 }
 
 const communityService = {
@@ -64,8 +65,16 @@ const communityService = {
     image_url?: string;
     is_private?: boolean;
   }): Promise<Community> {
-    const res = await ApiService.client.post('/communities', payload);
-    return res.data;
+    try {
+      const res = await ApiService.client.post('/communities', payload);
+      return res.data;
+    } catch (error: any) {
+      // Check if error is due to non-Pro user
+      if (error.response?.data?.requiresPro) {
+        throw new Error('PRO_REQUIRED');
+      }
+      throw error;
+    }
   },
 
   async updateCommunity(
@@ -97,7 +106,15 @@ const communityService = {
     communityId: number | string,
     username: string
   ): Promise<void> {
-    await ApiService.client.post(`/communities/${communityId}/join`, { username });
+    try {
+      await ApiService.client.post(`/communities/${communityId}/join`, { username });
+    } catch (error: any) {
+      // Check if error is due to private community
+      if (error.response?.data?.requiresRequest) {
+        throw new Error('REQUIRES_REQUEST');
+      }
+      throw error;
+    }
   },
 
   async leaveCommunity(
@@ -117,6 +134,19 @@ const communityService = {
       params: { limit },
     });
     return res.data || [];
+  },
+
+  async getMemberRole(
+    communityId: number | string,
+    username: string
+  ): Promise<'admin' | 'moderator' | 'member' | null> {
+    try {
+      const members = await this.getCommunityMembers(communityId);
+      const member = members.find((m: any) => m.username === username);
+      return member ? member.role : null;
+    } catch {
+      return null;
+    }
   },
 
   async getUserJoinedCommunities(
@@ -140,9 +170,17 @@ const communityService = {
       params: {
         limit: params?.limit,
         before: params?.before,
+        viewer: params?.viewer,
       },
     });
-    return res.data || [];
+    const rawPosts = res.data || [];
+    
+    // Map server field names to client field names
+    return rawPosts.map((post: any) => ({
+      ...post,
+      authorAvatar: post.author_avatar || post.authorAvatar,
+      authorDisplayName: post.author_display_name || post.authorDisplayName,
+    }));
   },
 
   async createCommunityPost(
@@ -294,6 +332,103 @@ const communityService = {
       { actor, content }
     );
     return res.data;
+  },
+
+  // --------- ADMIN MANAGEMENT ----------
+
+  async updateMemberRole(
+    communityId: number | string,
+    username: string,
+    role: 'admin' | 'moderator' | 'member',
+    actor: string
+  ): Promise<any> {
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/members/${username}/role`,
+      { actor, role }
+    );
+    return res.data;
+  },
+
+  async kickMember(
+    communityId: number | string,
+    username: string,
+    actor: string
+  ): Promise<void> {
+    await ApiService.client.delete(
+      `/communities/${communityId}/members/${username}`,
+      { data: { actor } }
+    );
+  },
+
+  async uploadCommunityAvatar(
+    communityId: number | string,
+    actor: string,
+    imageFile: any
+  ): Promise<Community> {
+    const formData = new FormData();
+    formData.append('actor', actor);
+    formData.append('avatar', imageFile);
+
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/avatar`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return res.data;
+  },
+
+  async uploadCommunityCover(
+    communityId: number | string,
+    actor: string,
+    imageFile: any
+  ): Promise<Community> {
+    const formData = new FormData();
+    formData.append('actor', actor);
+    formData.append('cover', imageFile);
+
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/cover`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return res.data;
+  },
+
+  // --------- JOIN REQUEST MANAGEMENT ----------
+
+  async requestToJoin(
+    communityId: number | string,
+    username: string
+  ): Promise<any> {
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/join-request`,
+      { username }
+    );
+    return res.data;
+  },
+
+  async getJoinRequests(
+    communityId: number | string,
+    actor: string,
+    status: 'pending' | 'approved' | 'rejected' = 'pending'
+  ): Promise<any[]> {
+    const res = await ApiService.client.get(
+      `/communities/${communityId}/join-requests`,
+      { params: { actor, status } }
+    );
+    return res.data || [];
+  },
+
+  async reviewJoinRequest(
+    communityId: number | string,
+    requestId: number | string,
+    action: 'approve' | 'reject',
+    actor: string
+  ): Promise<void> {
+    await ApiService.client.post(
+      `/communities/${communityId}/join-requests/${requestId}`,
+      { actor, action }
+    );
   },
 
 };

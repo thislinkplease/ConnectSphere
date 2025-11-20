@@ -120,7 +120,7 @@ export default function SettingsScreen() {
             <SettingRow
               icon="person-outline"
               title="Edit Profile"
-              onPress={() => router.push('/account /edit-profile')}
+              onPress={() => router.push('/account/edit-profile')}
               showChevron
             />
             <SettingRow

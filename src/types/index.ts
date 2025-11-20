@@ -86,12 +86,14 @@ export interface HangoutActivity {
 // Chat related types
 export interface Chat {
   id: string;
-  type: 'event' | 'user' | 'group'|'dm';
+  type: 'event' | 'user' | 'group' | 'dm' | 'community';
   name?: string;
   participants?: User[];
   lastMessage?: Message;
   unreadCount?: number;
   eventId?: string;
+  communityId?: number;
+  communityAvatar?: string;
 }
 
 export interface Message {
@@ -116,16 +118,41 @@ export interface Community {
   id: number;
   name: string;
   description?: string | null;
+  bio?: string | null;
   image_url?: string | null;
+  cover_image?: string | null;
 
   created_by: string;
 
   member_count: number;
   post_count: number;
   is_private: boolean;
+  
+  chat_conversation_id?: number | null;
 
   created_at: string;
   updated_at: string;
+}
+
+export interface CommunityMember {
+  id: number;
+  community_id: number;
+  username: string;
+  role: 'admin' | 'moderator' | 'member';
+  joined_at: string;
+  user?: User;
+}
+
+export interface CommunityJoinRequest {
+  id: number;
+  community_id: number;
+  username: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  users?: User;
 }
 
 export interface PostMedia {

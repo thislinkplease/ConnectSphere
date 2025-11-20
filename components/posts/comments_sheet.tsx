@@ -38,6 +38,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [visibleReplies, setVisibleReplies] = useState<Record<number, number>>({});
   const [userAvatar, setUserAvatar] = useState<Record<string, string>>({});
+  const [userData, setUserData] = useState<Record<string, { name: string; avatar: string }>>({});
 
   useEffect(() => {
     Animated.spring(translateY, {
@@ -101,27 +102,32 @@ export default function CommentsSheet(props: CommentsSheetProps) {
       );
 
       for (const username of usernames) {
-        if (userAvatar[username]) continue;
+        if (userData[username]) continue;
 
         try {
           const user = await ApiService.getUserByUsername(username);
 
-          setUserAvatar((prev) => ({
+          setUserData((prev) => ({
             ...prev,
-            [username]:
-              user.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                username
-              )}&background=random`,
+            [username]: {
+              name: user.name || username,
+              avatar: user.avatar ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  user.name || username
+                )}&background=random`,
+            },
           }));
         } catch (err) {
           console.log("Failed loading user:", username);
 
-          setUserAvatar((prev) => ({
+          setUserData((prev) => ({
             ...prev,
-            [username]: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              username
-            )}&background=random`,
+            [username]: {
+              name: username,
+              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                username
+              )}&background=random`,
+            },
           }));
         }
       }
@@ -352,7 +358,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
       <Image
         source={{
           uri:
-            userAvatar[reply.author_username] ||
+            userData[reply.author_username]?.avatar ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.author_username)}&background=random`
         }}
         style={styles.avatar}
@@ -365,7 +371,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
           style={styles.commentBubble}
         >
           <Pressable onPress={() => handlePressUsername(reply.author_username)}>
-            <Text style={styles.usernameText}>{reply.author_username}</Text>
+            <Text style={styles.usernameText}>{userData[reply.author_username]?.name || reply.author_username}</Text>
           </Pressable>
           <Text style={styles.contentText}>{reply.content}</Text>
           <Text style={styles.timeText}>{formattedTime(reply.created_at)}</Text>
@@ -385,7 +391,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
         <Image
           source={{
             uri:
-              userAvatar[item.author_username] ||
+              userData[item.author_username]?.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(item.author_username)}&background=random`
           }}
           style={styles.avatar}
@@ -398,7 +404,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
             style={styles.commentBubble}
           >
             <Pressable onPress={() => handlePressUsername(item.author_username)}>
-              <Text style={styles.usernameText}>{item.author_username}</Text>
+              <Text style={styles.usernameText}>{userData[item.author_username]?.name || item.author_username}</Text>
             </Pressable>
             <Text style={styles.contentText}>{item.content}</Text>
             <Text style={styles.timeText}>{formattedTime(item.created_at)}</Text>
@@ -483,7 +489,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
                 style={{ fontWeight: '600', textDecorationLine: 'underline' }}
                 onPress={() => handlePressUsername(replyTo.author_username)}
               >
-                {replyTo.author_username}
+                {userData[replyTo.author_username]?.name || replyTo.author_username}
               </Text>
             </Text>
 
