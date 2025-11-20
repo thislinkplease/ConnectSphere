@@ -325,10 +325,15 @@ export default function ChatScreen() {
         await ApiService.sendMessageWithImage(
           chatId,
           currentUser.username,
-            inputText || '📷 Photo',
+          inputText || '📷 Photo',
           imageFile
         );
         setInputText('');
+        
+        // Reload messages to show the newly sent image
+        setTimeout(() => {
+          loadMessages();
+        }, 500);
       }
 
       setUploading(false);
@@ -468,13 +473,6 @@ export default function ChatScreen() {
           title: otherUser?.name || 'Conversation',
           headerRight: () => (
             <View style={styles.headerRight}>
-
-              <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="call-outline" size={24} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="videocam-outline" size={24} color={colors.primary} />
-              </TouchableOpacity>
               <TouchableOpacity style={styles.headerButton}>
                 <Ionicons name="ellipsis-vertical" size={24} color={colors.primary} />
               </TouchableOpacity>

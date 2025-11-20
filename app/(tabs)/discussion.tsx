@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Community } from '@/src/types';
 import ApiService from '@/src/services/api';
 import { useTheme } from '@/src/context/ThemeContext';
+import { useAuth } from '@/src/context/AuthContext';
 import { useRouter } from "expo-router";
 
 export default function DiscussionScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, isPro } = useTheme();
+  const { user } = useAuth();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -46,9 +48,33 @@ export default function DiscussionScreen() {
     setRefreshing(false);
   }, [loadCommunities]);
 
+  const handleCreateCommunity = useCallback(() => {
+    if (!isPro) {
+      Alert.alert(
+        'PRO Feature',
+        'Creating communities is a PRO feature. Upgrade to PRO to create your own community!',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Upgrade to PRO',
+            onPress: () => router.push('/account/payment-pro'),
+          },
+        ]
+      );
+      return;
+    }
+    
+    // Navigate to create community screen
+    router.push('/overview/create-community');
+  }, [isPro, router]);
+
   const renderCommunityCard = ({ item }: { item: Community }) => (
     <TouchableOpacity 
-      style={styles.communityCard}
+      style={[styles.communityCard, { 
+        backgroundColor: colors.card,
+        shadowColor: colors.shadow,
+        borderColor: colors.border,
+      }]}
       onPress={() => 
         router.push({
           pathname: '/overview/community',
@@ -60,16 +86,16 @@ export default function DiscussionScreen() {
         <Image source={{ uri: item.image_url }} style={styles.communityImage} />
       )}
       <View style={styles.communityContent}>
-        <Text style={styles.communityName}>{item.name}</Text>
+        <Text style={[styles.communityName, { color: colors.text }]}>{item.name}</Text>
         {item.description && (
-          <Text style={styles.communityDescription} numberOfLines={2}>
+          <Text style={[styles.communityDescription, { color: colors.textSecondary }]} numberOfLines={2}>
             {item.description}
           </Text>
         )}
         <View style={styles.communityFooter}>
           <View style={styles.memberCount}>
-            <Ionicons name="people-outline" size={16} color="#666" />
-            <Text style={styles.memberCountText}>
+            <Ionicons name="people-outline" size={16} color={colors.textMuted} />
+            <Text style={[styles.memberCountText, { color: colors.textSecondary }]}>
               {item.member_count} members
             </Text>
           </View>
@@ -81,21 +107,37 @@ export default function DiscussionScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={styles.headerTitle}>OverView</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>OverView</Text>
       </View>
 
       <View style={[styles.searchContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
+        <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.text }]}
           placeholder="Search communities"
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textMuted}
         />
       </View>
 
-      <Text style={styles.sectionTitle}>Suggested Communities</Text>
+      <TouchableOpacity
+        style={[
+          styles.createButton,
+          {
+            backgroundColor: isPro ? colors.primary : colors.border,
+            borderColor: isPro ? colors.primary : colors.border,
+          },
+        ]}
+        onPress={handleCreateCommunity}
+      >
+        <Ionicons name="add-circle-outline" size={20} color={isPro ? '#fff' : colors.textMuted} />
+        <Text style={[styles.createButtonText, { color: isPro ? '#fff' : colors.textMuted }]}>
+          {isPro ? 'Create Community' : 'Create Community (PRO)'}
+        </Text>
+      </TouchableOpacity>
+
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested Communities</Text>
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
@@ -112,8 +154,8 @@ export default function DiscussionScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No communities yet</Text>
+              <Ionicons name="people-outline" size={64} color={colors.disabled} />
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No communities yet</Text>
             </View>
           }
         />
@@ -133,7 +175,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -148,19 +189,18 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
   },
-  uploadButton: {
+  createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 8,
     borderWidth: 1,
   },
-  uploadButtonText: {
+  createButtonText: {
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
@@ -168,7 +208,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 12,
@@ -177,15 +216,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   communityCard: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
     elevation: 2,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    borderWidth: 1,
   },
   communityImage: {
     width: '100%',
@@ -198,12 +236,10 @@ const styles = StyleSheet.create({
   communityName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 6,
   },
   communityDescription: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -218,7 +254,6 @@ const styles = StyleSheet.create({
   },
   memberCountText: {
     fontSize: 14,
-    color: '#666',
     marginLeft: 6,
   },
   emptyContainer: {
@@ -229,7 +264,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#999',
     marginTop: 16,
   },
   loadingContainer: {

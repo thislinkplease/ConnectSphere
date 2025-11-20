@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
-import { formatCount, formatToVietnamTime } from '@/src/utils/timeUtils';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import { formatCount, formatToVietnamTime } from '@/src/utils/date';
 import type { Post } from '@/src/types';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -20,6 +21,23 @@ export interface PostItemProps {
   showMoreMenu?: boolean;
 }
 
+// Video component for single media
+function VideoPlayer({ uri, style }: { uri: string; style: any }) {
+  const player = useVideoPlayer(uri, (player) => {
+    player.loop = false;
+    player.muted = false;
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={style}
+      nativeControls
+      contentFit="cover"
+    />
+  );
+}
+
 export default function PostItem({
   post,
   onEditClick,
@@ -32,6 +50,7 @@ export default function PostItem({
   onFollowClick = () => {},
   showMoreMenu = true,
 }: PostItemProps) {
+  const router = useRouter();
   const [isLiked, setIsLiked] = useState<boolean>(!!initialIsLiked);
   const [likeCount, setLikeCount] = useState<number>(post?.like_count ?? 0);
 
@@ -48,24 +67,43 @@ export default function PostItem({
     onLikeToggle?.(post, next);
   };
 
-  const avatarUri = post?.authorAvatar || 'https://i.pravatar.cc/100';
+  const avatarUri = post?.authorAvatar;
+  const displayName = post?.authorDisplayName || post?.author_username;
+  const username = post?.author_username;
   const media = post?.post_media ?? [];
+
+  const handleProfileNavigation = () => {
+    if (username) {
+      router.push({
+        pathname: '/account/profile',
+        params: { username },
+      });
+    }
+  };
 
   return (
     <View style={styles.card}>
 
       {/* Header */}
       <View style={styles.headerRow}>
-        <Image source={{ uri: avatarUri }} style={styles.avatar} />
+        <Pressable onPress={handleProfileNavigation} hitSlop={8}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Ionicons name="person-circle-outline" size={40} color="#999" />
+            </View>
+          )}
+        </Pressable>
 
-        <View style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1 }} onPress={handleProfileNavigation}>
           <Text style={styles.username} numberOfLines={1}>
-            {post?.author_username}
+            {displayName}
             {post?.community_name ? (
-              <Text style={styles.inCommunity}>  in "{post.community_name}"</Text>
+              <Text style={styles.inCommunity}>  in &quot;{post.community_name}&quot;</Text>
             ) : null}
           </Text>
-        </View>
+        </Pressable>
 
         {showMoreMenu && (
           <Pressable hitSlop={8} onPress={() => actionSheet(post, onEditClick, onDeleteClick)}>
@@ -78,12 +116,7 @@ export default function PostItem({
       {media.length > 0 && (
         media.length === 1 ? (
           media[0].media_type === 'video' ? (
-            <Video
-              source={{ uri: media[0].media_url }}
-              style={styles.singleMedia}
-              useNativeControls
-              resizeMode={ResizeMode.COVER}
-            />
+            <VideoPlayer uri={media[0].media_url} style={styles.singleMedia} />
           ) : (
             <Image
               source={{ uri: media[0].media_url }}
@@ -95,11 +128,10 @@ export default function PostItem({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 8 }}>
             {media.map((m, idx) =>
               m.media_type === 'video' ? (
-                <Video
+                <VideoPlayer
                   key={m.id ?? idx}
-                  source={{ uri: m.media_url }}
+                  uri={m.media_url}
                   style={styles.multiMedia}
-                  useNativeControls
                 />
               ) : (
                 <Image
@@ -131,7 +163,9 @@ export default function PostItem({
       {(caption?.length || timeAgo) ? (
         <View style={styles.captionWrap}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Text style={styles.captionUser}>{post?.author_username} </Text>
+            <Pressable onPress={handleProfileNavigation}>
+              <Text style={styles.captionUser}>{displayName} </Text>
+            </Pressable>
             {!!caption && <Text style={styles.captionText} numberOfLines={2}>{caption}</Text>}
           </View>
 
@@ -173,6 +207,10 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#eee',
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   username: {
     fontSize: 15,

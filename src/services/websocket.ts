@@ -224,6 +224,76 @@ class WebSocketService {
     }
   }
 
+  // ==================== Community Chat Methods ====================
+
+  // Join community chat
+  joinCommunityChat(communityId: number) {
+    if (this.socket?.connected) {
+      this.socket.emit('join_community_chat', { communityId });
+      console.log(`Joined community chat ${communityId}`);
+    }
+  }
+
+  // Leave community chat
+  leaveCommunityChat(communityId: number) {
+    if (this.socket?.connected) {
+      this.socket.emit('leave_community_chat', { communityId });
+      console.log(`Left community chat ${communityId}`);
+    }
+  }
+
+  // Send community message
+  sendCommunityMessage(communityId: number, senderUsername: string, content: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('send_community_message', {
+        communityId,
+        senderUsername,
+        content,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  // Send community typing indicator
+  sendCommunityTyping(communityId: number, username: string, isTyping: boolean) {
+    if (this.socket?.connected) {
+      this.socket.emit('community_typing', {
+        communityId,
+        username,
+        isTyping,
+      });
+    }
+  }
+
+  // Listen for new community messages
+  onNewCommunityMessage(callback: (message: any) => void) {
+    if (this.socket) {
+      this.socket.on('new_community_message', callback);
+    }
+  }
+
+  // Listen for community typing indicator
+  onCommunityTyping(callback: (data: { communityId: number; username: string; isTyping: boolean }) => void) {
+    if (this.socket) {
+      this.socket.on('community_typing', callback);
+    }
+  }
+
+  // Listen for user joined community chat
+  onUserJoinedCommunityChat(callback: (data: { communityId: number; username: string }) => void) {
+    if (this.socket) {
+      this.socket.on('user_joined_community_chat', callback);
+    }
+  }
+
+  // Listen for user left community chat
+  onUserLeftCommunityChat(callback: (data: { communityId: number; username: string }) => void) {
+    if (this.socket) {
+      this.socket.on('user_left_community_chat', callback);
+    }
+  }
+
   // Remove all listeners
   removeAllListeners() {
     if (this.socket) {
@@ -236,6 +306,22 @@ class WebSocketService {
     if (this.socket) {
       this.socket.off(event, callback);
     }
+  }
+
+  // Generic event listener for any socket event
+  on(event: string, callback: (...args: any[]) => void) {
+    if (this.socket) {
+      this.socket.on(event, callback);
+    }
+  }
+
+  // Generic event emitter for any socket event
+  emit(event: string, ...args: any[]) {
+    if (this.socket?.connected) {
+      this.socket.emit(event, ...args);
+      return true;
+    }
+    return false;
   }
 
   // Check if connected

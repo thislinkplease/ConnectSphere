@@ -15,7 +15,7 @@ export default function InboxScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const [chats, setChats] = useState<Chat[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'events' | 'users'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'communities' | 'users'>('all');
   const [loading, setLoading] = useState(true);
 
   // 1) Đảm bảo WebSocket kết nối khi ở Inbox
@@ -261,13 +261,14 @@ export default function InboxScreen() {
 
   const filteredChats = chats.filter(chat => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'events') return chat.type === 'event';
-    if (activeTab === 'users') return chat.type === 'user';
+    if (activeTab === 'communities') return chat.type === 'community';
+    if (activeTab === 'users') return chat.type === 'user' || chat.type === 'dm';
     return true;
   });
 
   const renderChatItem = ({ item }: { item: Chat }) => {
     const isDM = item.type === 'dm' || item.type === 'user';
+    const isCommunity = item.type === 'community';
 
     // Find the other user in participants (not the current user)
     let otherUser = isDM
@@ -284,7 +285,9 @@ export default function InboxScreen() {
 
     // CRITICAL: Build robust display name - NEVER show "Direct Message" or generic text
     let displayName: string;
-    if (isDM) {
+    if (isCommunity) {
+      displayName = item.name || 'Community Chat';
+    } else if (isDM) {
       if (otherUser?.name && otherUser.name !== otherUser.username) {
         // User has a proper display name
         displayName = otherUser.name;
@@ -306,8 +309,12 @@ export default function InboxScreen() {
       displayName = item.name || 'Group Chat';
     }
 
-    // Get avatar - ensure we ALWAYS use the other user's avatar for DM
-    const avatarUrl = isDM ? (otherUser?.avatar || '') : '';
+    // Get avatar - ensure we ALWAYS use the other user's avatar for DM or community avatar for community
+    const avatarUrl = isCommunity 
+      ? (item.communityAvatar || '') 
+      : isDM 
+        ? (otherUser?.avatar || '') 
+        : '';
     const hasAvatar = Boolean(avatarUrl && avatarUrl.length > 0);
 
     const relativeTime = item.lastMessage?.timestamp
@@ -322,7 +329,7 @@ export default function InboxScreen() {
         onPress={() => handleOpenChat(item)}
       >
         <View style={styles.avatarContainer}>
-          {isDM ? (
+          {isDM || isCommunity ? (
             hasAvatar ? (
               <Image 
                 source={{ uri: avatarUrl }} 
@@ -330,7 +337,7 @@ export default function InboxScreen() {
               />
             ) : (
               <View style={styles.eventAvatarPlaceholder}>
-                <Ionicons name="person-circle" size={32} color="#999" />
+                <Ionicons name={isCommunity ? "people" : "person-circle"} size={32} color={isCommunity ? colors.primary : "#999"} />
               </View>
             )
           ) : (
@@ -386,11 +393,11 @@ export default function InboxScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'events' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
-          onPress={() => setActiveTab('events')}
+          style={[styles.tab, activeTab === 'communities' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
+          onPress={() => setActiveTab('communities')}
         >
-          <Text style={[styles.tabText, activeTab === 'events' && [styles.activeTabText, { color: colors.primary }]]}>
-            Events
+          <Text style={[styles.tabText, activeTab === 'communities' && [styles.activeTabText, { color: colors.primary }]]}>
+            Community
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

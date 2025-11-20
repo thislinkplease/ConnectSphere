@@ -300,6 +300,19 @@ class ApiService {
     }
   }
 
+  async areMutualFollowers(username1: string, username2: string): Promise<boolean> {
+    try {
+      const [user1FollowsUser2, user2FollowsUser1] = await Promise.all([
+        this.isFollowing(username2, username1), // username1 follows username2
+        this.isFollowing(username1, username2), // username2 follows username1
+      ]);
+      return user1FollowsUser2 && user2FollowsUser1;
+    } catch (error) {
+      console.error('Error checking mutual follow status:', error);
+      return false;
+    }
+  }
+
    // Create or get existing direct conversation with otherUsername
   async createOrGetDirectConversation(currentUsername: string, otherUsername: string): Promise<{ id: string | number }> {
     const response = await this.client.post('/messages/conversations', {

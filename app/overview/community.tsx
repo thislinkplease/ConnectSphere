@@ -16,11 +16,13 @@ import communityService, { CommunityPost } from '@/src/services/communityService
 import type { Community, User, UserLite } from '@/src/types';
 import PostItem from '@/components/posts/post_item';
 import CommentsSheet from '@/components/posts/comments_sheet';
+import { useTheme } from '@/src/context/ThemeContext';
 
 export default function CommunityScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const communityId = useMemo(() => Number(id), [id]);
+  const { colors, isPro } = useTheme();
 
   const [me, setMe] = useState<User | null>(null);
   const [community, setCommunity] = useState<(Community & { is_member?: boolean }) | null>(null);
@@ -66,7 +68,10 @@ export default function CommunityScreen() {
         const c = await communityService.getCommunity(communityId, viewer);
         setCommunity(c);
 
-        const first = await communityService.getCommunityPosts(communityId, { limit: 10 });
+        const first = await communityService.getCommunityPosts(communityId, { 
+          limit: 10, 
+          viewer: me?.username 
+        });
         setPosts(first);
         cursorRef.current = first.length ? first[first.length - 1].created_at : null;
         setHasMore(first.length >= 10);
@@ -76,7 +81,7 @@ export default function CommunityScreen() {
         setLoading(false);
       }
     })();
-  }, [communityId]);
+  }, [communityId, me?.username]);
 
   const onRefresh = useCallback(async () => {
     if (!communityId) return;
@@ -86,7 +91,10 @@ export default function CommunityScreen() {
       const c = await communityService.getCommunity(communityId, viewer);
       setCommunity(c);
 
-      const fresh = await communityService.getCommunityPosts(communityId, { limit: 10 });
+      const fresh = await communityService.getCommunityPosts(communityId, { 
+        limit: 10,
+        viewer: me?.username
+      });
       setPosts(fresh);
       cursorRef.current = fresh.length ? fresh[fresh.length - 1].created_at : null;
       setHasMore(fresh.length >= 10);
@@ -103,6 +111,7 @@ export default function CommunityScreen() {
       const next = await communityService.getCommunityPosts(communityId, {
         limit: 10,
         before: cursorRef.current || undefined,
+        viewer: me?.username,
       });
       if (next.length === 0) {
         setHasMore(false);
@@ -153,31 +162,64 @@ export default function CommunityScreen() {
 
   const renderHeader = useMemo(() => {
     if (!community) return null;
+    
+    // Check if current user is admin/moderator
+    const isUserAdmin = me?.username && (
+      me.username === community.created_by ||
+      // We'll check this properly later when we fetch member role
+      false
+    );
+    
     return (
-      <View>
+      <View style={{ backgroundColor: colors.card }}>
         {/* TOP BANNER */}
         {!!community.image_url && (
           <Image source={{ uri: community.image_url }} style={styles.banner} />
         )}
 
         {/* HEADER */}
-        <View style={styles.headerBox}>
-          <Text style={styles.communityName}>{community.name}</Text>
+        <View style={[styles.headerBox, { backgroundColor: colors.card }]}>
+          <View style={styles.titleRow}>
+            <Text style={[styles.communityName, { color: colors.text }]}>{community.name}</Text>
+            {me?.username === community.created_by && (
+              <Pressable 
+                style={styles.settingsButton}
+                onPress={() => router.push({
+                  pathname: '/overview/community-settings',
+                  params: { id: String(communityId) },
+                })}
+              >
+                <Ionicons name="settings-outline" size={24} color={colors.text} />
+              </Pressable>
+            )}
+          </View>
           <View style={styles.subInfoRow}>
-            <Ionicons name="globe-outline" size={16} color="#555" />
-            <Text style={styles.subText}>
+            <Ionicons name="globe-outline" size={16} color={colors.textSecondary} />
+            <Text style={[styles.subText, { color: colors.textSecondary }]}>
               {community.is_private ? 'Private' : 'Public'} · {community.member_count ?? 0} members
             </Text>
           </View>
 
           <View style={styles.btnRow}>
             {community.is_member ? (
-              <Pressable style={styles.joinedBtn} onPress={onLeavePress}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#111" />
-                <Text style={styles.joinedText}>Joined</Text>
-              </Pressable>
+              <>
+                <Pressable style={[styles.joinedBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onLeavePress}>
+                  <Ionicons name="checkmark-circle-outline" size={20} color={colors.text} />
+                  <Text style={[styles.joinedText, { color: colors.text }]}>Joined</Text>
+                </Pressable>
+                <Pressable 
+                  style={[styles.chatBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push({
+                    pathname: '/overview/community-chat',
+                    params: { id: String(communityId), name: community.name },
+                  })}
+                >
+                  <Ionicons name="chatbubbles" size={20} color="#fff" />
+                  <Text style={styles.chatText}>Chat</Text>
+                </Pressable>
+              </>
             ) : (
-              <Pressable style={styles.inviteBtn} onPress={onJoinPress}>
+              <Pressable style={[styles.inviteBtn, { backgroundColor: colors.primary }]} onPress={onJoinPress}>
                 <Ionicons name="person-add-outline" size={20} color="#fff" />
                 <Text style={styles.inviteText}>Join</Text>
               </Pressable>
@@ -185,24 +227,36 @@ export default function CommunityScreen() {
           </View>
         </View>
 
-        {/* POST INPUT */}
-        <View style={styles.postBox}>
-          <Image
-            source={{ uri: me?.avatar || 'https://i.pravatar.cc/100' }}
-            style={styles.avatar}
-          />
-          <Pressable
-            style={styles.postInput}
-            onPress={() => router.push(`/overview/post?communityId=${communityId}`)}
-          >
-            <Text style={{ color: '#777' }}>What's on your mind?</Text>
-          </Pressable>
-        </View>
+        {/* POST INPUT - Only show for members */}
+        {community.is_member && (
+          <View style={[styles.postBox, { backgroundColor: colors.card }]}>
+            <Image
+              source={{ uri: me?.avatar || 'https://i.pravatar.cc/100' }}
+              style={styles.avatar}
+            />
+            <Pressable
+              style={[styles.postInput, { borderColor: colors.border, backgroundColor: colors.surface }]}
+              onPress={() => router.push(`/overview/post?communityId=${communityId}`)}
+            >
+              <Text style={{ color: colors.textMuted }}>What&apos;s on your mind?</Text>
+            </Pressable>
+          </View>
+        )}
 
-        <View style={styles.separator} />
+        {/* Private community message for non-members */}
+        {community.is_private && !community.is_member && (
+          <View style={[styles.privateNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} />
+            <Text style={[styles.privateNoticeText, { color: colors.textSecondary }]}>
+              This is a private community. Join to see posts and participate in discussions.
+            </Text>
+          </View>
+        )}
+
+        <View style={[styles.separator, { backgroundColor: colors.surfaceVariant }]} />
       </View>
     );
-  }, [community, me?.avatar, onJoinPress, onLeavePress, router, communityId]);
+  }, [community, me?.avatar, onJoinPress, onLeavePress, router, communityId, colors]);
 
   const renderItem = useCallback(({ item }: { item: CommunityPost }) => {
     return (
@@ -221,8 +275,8 @@ export default function CommunityScreen() {
 
   if (loading && posts.length === 0) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator />
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -230,7 +284,7 @@ export default function CommunityScreen() {
   return (
     <>
       <FlatList
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         data={posts}
         keyExtractor={(it) => String(it.id)}
         renderItem={renderItem}
@@ -238,12 +292,12 @@ export default function CommunityScreen() {
         onEndReachedThreshold={0.3}
         onEndReached={loadMore}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListFooterComponent={
           hasMore ? (
-            <View style={{ paddingVertical: 16 }}>
-              <ActivityIndicator />
+            <View style={{ paddingVertical: 16, backgroundColor: colors.background }}>
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : <View style={{ height: 16 }} />
         }
@@ -262,25 +316,47 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   banner: { width: '100%', height: 200, backgroundColor: '#ddd' },
   headerBox: { padding: 16 },
-  communityName: { fontSize: 22, fontWeight: '700', color: '#111' },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  communityName: { fontSize: 22, fontWeight: '700', flex: 1 },
+  settingsButton: { padding: 4, marginLeft: 8 },
   subInfoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  subText: { marginLeft: 6, fontSize: 14, color: '#555' },
+  subText: { marginLeft: 6, fontSize: 14 },
   btnRow: { flexDirection: 'row', marginTop: 16, gap: 12 },
   joinedBtn: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 16, backgroundColor: '#ececec', borderRadius: 8,
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1,
   },
-  joinedText: { fontSize: 15, marginLeft: 6, color: '#111' },
+  joinedText: { fontSize: 15, marginLeft: 6 },
   inviteBtn: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#000',
+    paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8,
   },
   inviteText: { color: '#fff', marginLeft: 6, fontSize: 15 },
+  chatBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8,
+  },
+  chatText: { color: '#fff', marginLeft: 6, fontSize: 15 },
   postBox: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 10 },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#ccc' },
-  postInput: { flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16 },
-  separator: { height: 7, backgroundColor: '#f1f1f1', width: '100%' },
+  postInput: { flex: 1, borderWidth: 1, borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16 },
+  privateNotice: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 16, 
+    gap: 12, 
+    marginHorizontal: 16, 
+    marginVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  privateNoticeText: { 
+    flex: 1, 
+    fontSize: 14, 
+    lineHeight: 20,
+  },
+  separator: { height: 7, width: '100%' },
 });
