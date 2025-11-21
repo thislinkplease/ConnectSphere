@@ -75,8 +75,14 @@ export default function CommunityScreen() {
         setPosts(first);
         cursorRef.current = first.length ? first[first.length - 1].created_at : null;
         setHasMore(first.length >= 10);
-      } catch (e) {
-        console.error('load community error', e);
+      } catch (e: any) {
+        // If 403, user is not a member - show empty posts
+        if (e?.response?.status === 403) {
+          setPosts([]);
+          setHasMore(false);
+        } else {
+          console.error('load community error', e);
+        }
       } finally {
         setLoading(false);
       }
@@ -98,8 +104,14 @@ export default function CommunityScreen() {
       setPosts(fresh);
       cursorRef.current = fresh.length ? fresh[fresh.length - 1].created_at : null;
       setHasMore(fresh.length >= 10);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      // If 403, user is not a member - show empty posts
+      if (e?.response?.status === 403) {
+        setPosts([]);
+        setHasMore(false);
+      } else {
+        console.error(e);
+      }
     } finally {
       setRefreshing(false);
     }
@@ -140,6 +152,9 @@ export default function CommunityScreen() {
     try {
       await communityService.leaveCommunity(communityId, me.username);
       setCommunity((prev) => prev ? { ...prev, is_member: false, member_count: Math.max(0, (prev.member_count ?? 0) - 1) } : prev);
+      // Clear posts when leaving since user can no longer see them
+      setPosts([]);
+      setHasMore(false);
     } catch (e) {
       console.error(e);
     }

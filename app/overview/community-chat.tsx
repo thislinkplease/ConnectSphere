@@ -202,19 +202,28 @@ export default function CommunityChatScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: CommunityMessage }) => {
+  const renderMessage = ({ item, index }: { item: CommunityMessage; index: number }) => {
     const isOwnMessage = item.sender_username === user?.username;
     const senderName = item.sender?.name || item.sender_username;
     const senderAvatar = item.sender?.avatar;
+    
+    // Check if this is the first message from this sender in a group
+    const prevMessage = index > 0 ? messages[index - 1] : null;
+    const isFirstInGroup = !prevMessage || prevMessage.sender_username !== item.sender_username;
+    
+    // Check if this is the last message from this sender in a group
+    const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
+    const isLastInGroup = !nextMessage || nextMessage.sender_username !== item.sender_username;
 
     return (
       <View
         style={[
           styles.messageContainer,
           isOwnMessage && styles.ownMessageContainer,
+          !isFirstInGroup && styles.groupedMessage,
         ]}
       >
-        {!isOwnMessage && (
+        {!isOwnMessage && isLastInGroup && (
           senderAvatar ? (
             <Image source={{ uri: senderAvatar }} style={styles.messageAvatar} />
           ) : (
@@ -222,6 +231,9 @@ export default function CommunityChatScreen() {
               <Ionicons name="person-circle-outline" size={28} color={colors.textMuted} />
             </View>
           )
+        )}
+        {!isOwnMessage && !isLastInGroup && (
+          <View style={styles.messageAvatarSpacer} />
         )}
 
         <View
@@ -232,10 +244,11 @@ export default function CommunityChatScreen() {
               borderColor: isOwnMessage ? colors.primary : colors.border,
             },
             isOwnMessage && { alignSelf: 'flex-end' },
+            !isFirstInGroup && styles.groupedBubble,
           ]}
         >
-          {!isOwnMessage && (
-            <Text style={[styles.senderName, { color: colors.text }]}>
+          {!isOwnMessage && isFirstInGroup && (
+            <Text style={[styles.senderName, { color: colors.primary }]}>
               {senderName}
             </Text>
           )}
@@ -247,14 +260,16 @@ export default function CommunityChatScreen() {
           >
             {item.content}
           </Text>
-          <Text
-            style={[
-              styles.messageTime,
-              { color: isOwnMessage ? 'rgba(255,255,255,0.7)' : colors.textSecondary },
-            ]}
-          >
-            {formatMessageTime(item.created_at)}
-          </Text>
+          {isLastInGroup && (
+            <Text
+              style={[
+                styles.messageTime,
+                { color: isOwnMessage ? 'rgba(255,255,255,0.7)' : colors.textSecondary },
+              ]}
+            >
+              {formatMessageTime(item.created_at)}
+            </Text>
+          )}
         </View>
       </View>
     );
@@ -382,10 +397,17 @@ const styles = StyleSheet.create({
   ownMessageContainer: {
     flexDirection: 'row-reverse',
   },
+  groupedMessage: {
+    marginBottom: 2,
+  },
   messageAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    marginRight: 8,
+  },
+  messageAvatarSpacer: {
+    width: 32,
     marginRight: 8,
   },
   avatarPlaceholder: {
@@ -401,6 +423,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+  },
+  groupedBubble: {
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
   },
   senderName: {
     fontSize: 12,

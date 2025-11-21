@@ -26,6 +26,8 @@ export default function PostScreen() {
 
   const [meUsername, setMeUsername] = useState<string | null>(null);
   const [community, setCommunity] = useState<Community | null>(null);
+  const [isMember, setIsMember] = useState(false);
+  const [checkingMembership, setCheckingMembership] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -39,16 +41,37 @@ export default function PostScreen() {
   }, []);
 
   useEffect(() => {
-    if (!communityId) return;
+    if (!communityId || !meUsername) return;
     (async () => {
       try {
-        const c = await communityService.getCommunity(communityId);
+        setCheckingMembership(true);
+        const c = await communityService.getCommunity(communityId, meUsername);
         setCommunity(c as any);
+        // Check if user is a member
+        setIsMember(c.is_member || false);
+        
+        // If not a member, show alert and go back
+        if (!c.is_member) {
+          Alert.alert(
+            'Not a Member',
+            'You must be a member of this community to create posts.',
+            [
+              {
+                text: 'OK',
+                onPress: () => router.back(),
+              },
+            ]
+          );
+        }
       } catch (e) {
         console.warn(e);
+        Alert.alert('Error', 'Failed to load community information.');
+        router.back();
+      } finally {
+        setCheckingMembership(false);
       }
     })();
-  }, [communityId]);
+  }, [communityId, meUsername, router]);
 
   const handlePickMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -154,8 +177,13 @@ export default function PostScreen() {
         </View>
       </View>
 
-      <Button mode="contained" onPress={onSubmit} style={styles.submitBtn}>
-        Đăng bài
+      <Button 
+        mode="contained" 
+        onPress={onSubmit} 
+        style={styles.submitBtn}
+        disabled={checkingMembership || !isMember}
+      >
+        {checkingMembership ? 'Checking...' : 'Đăng bài'}
       </Button>
     </ScrollView>
   );

@@ -39,6 +39,20 @@ export default function CommentsSheet(props: CommentsSheetProps) {
   const [visibleReplies, setVisibleReplies] = useState<Record<number, number>>({});
   const [userAvatar, setUserAvatar] = useState<Record<string, string>>({});
   const [userData, setUserData] = useState<Record<string, { name: string; avatar: string }>>({});
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if current user is admin
+  useEffect(() => {
+    if (!visible || !me?.username) return;
+    (async () => {
+      try {
+        const role = await communityService.getMemberRole(communityId, me.username);
+        setIsAdmin(role === 'admin' || role === 'moderator');
+      } catch (e) {
+        console.warn('Error checking admin status:', e);
+      }
+    })();
+  }, [visible, communityId, me?.username]);
 
   useEffect(() => {
     Animated.spring(translateY, {
@@ -158,7 +172,9 @@ export default function CommentsSheet(props: CommentsSheetProps) {
   const handleLongPressComment = (comment: Comment) => {
     if (!me?.username) return;
 
-    if (comment.author_username === me.username) {
+    const isOwnComment = comment.author_username === me.username;
+    
+    if (isOwnComment) {
       Alert.alert(
         "Comment options",
         "Choose an action",
@@ -175,6 +191,33 @@ export default function CommentsSheet(props: CommentsSheetProps) {
             text: "Delete",
             style: "destructive",
             onPress: () => deleteComment(comment)
+          },
+          { text: "Cancel", style: "cancel" }
+        ]
+      );
+    } else if (isAdmin) {
+      // Admin can delete any comment
+      Alert.alert(
+        "Admin options",
+        "Manage this comment",
+        [
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              Alert.alert(
+                "Delete Comment",
+                "Are you sure you want to delete this comment as an admin?",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => deleteComment(comment)
+                  }
+                ]
+              );
+            }
           },
           { text: "Cancel", style: "cancel" }
         ]

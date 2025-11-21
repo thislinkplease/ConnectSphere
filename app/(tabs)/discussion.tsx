@@ -1,38 +1,66 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, RefreshControl, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Community } from '@/src/types';
 import ApiService from '@/src/services/api';
+import communityService from '@/src/services/communityService';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useAuth } from '@/src/context/AuthContext';
 import { useRouter } from "expo-router";
+
+type TabType = 'my-communities' | 'discover';
 
 export default function DiscussionScreen() {
   const router = useRouter();
   const { colors, isPro } = useTheme();
   const { user } = useAuth();
-  const [communities, setCommunities] = useState<Community[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('my-communities');
+  const [myCommunities, setMyCommunities] = useState<Community[]>([]);
+  const [discoverCommunities, setDiscoverCommunities] = useState<Community[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadCommunities = useCallback(async () => {
+  // Load my communities
+  const loadMyCommunities = useCallback(async () => {
+    if (!user?.username) return;
     try {
-      setLoading(true);
+      const data = await communityService.getUserJoinedCommunities(user.username, 50);
+      setMyCommunities(data);
+    } catch (error) {
+      console.error('Error loading my communities:', error);
+    }
+  }, [user?.username]);
+
+  // Load discover communities
+  const loadDiscoverCommunities = useCallback(async () => {
+    try {
       if (searchQuery.trim()) {
         const data = await ApiService.searchCommunities(searchQuery);
-        setCommunities(data);
+        setDiscoverCommunities(data);
       } else {
         const data = await ApiService.getSuggestedCommunities(20);
-        setCommunities(data);
+        setDiscoverCommunities(data);
       }
     } catch (error) {
-      console.error('Error loading communities:', error);
+      console.error('Error loading discover communities:', error);
+    }
+  }, [searchQuery]);
+
+  // Load communities based on active tab
+  const loadCommunities = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (activeTab === 'my-communities') {
+        await loadMyCommunities();
+      } else {
+        await loadDiscoverCommunities();
+      }
     } finally {
       setLoading(false);
     }
-  }, [searchQuery]);
+  }, [activeTab, loadMyCommunities, loadDiscoverCommunities]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -104,40 +132,97 @@ export default function DiscussionScreen() {
     </TouchableOpacity>
   );
 
+  const currentCommunities = activeTab === 'my-communities' ? myCommunities : discoverCommunities;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>OverView</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Communities</Text>
       </View>
 
-      <View style={[styles.searchContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search communities"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor={colors.textMuted}
-        />
+      {/* Tabs */}
+      <View style={[styles.tabsContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'my-communities' && styles.activeTab,
+            activeTab === 'my-communities' && { borderBottomColor: colors.primary },
+          ]}
+          onPress={() => setActiveTab('my-communities')}
+        >
+          <Ionicons 
+            name="people" 
+            size={20} 
+            color={activeTab === 'my-communities' ? colors.primary : colors.textMuted} 
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === 'my-communities' ? colors.primary : colors.textMuted },
+            ]}
+          >
+            My Communities
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'discover' && styles.activeTab,
+            activeTab === 'discover' && { borderBottomColor: colors.primary },
+          ]}
+          onPress={() => setActiveTab('discover')}
+        >
+          <Ionicons 
+            name="compass" 
+            size={20} 
+            color={activeTab === 'discover' ? colors.primary : colors.textMuted} 
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === 'discover' ? colors.primary : colors.textMuted },
+            ]}
+          >
+            Discover
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.createButton,
-          {
-            backgroundColor: isPro ? colors.primary : colors.border,
-            borderColor: isPro ? colors.primary : colors.border,
-          },
-        ]}
-        onPress={handleCreateCommunity}
-      >
-        <Ionicons name="add-circle-outline" size={20} color={isPro ? '#fff' : colors.textMuted} />
-        <Text style={[styles.createButtonText, { color: isPro ? '#fff' : colors.textMuted }]}>
-          {isPro ? 'Create Community' : 'Create Community (PRO)'}
-        </Text>
-      </TouchableOpacity>
+      {/* Search bar - only show in Discover tab */}
+      {activeTab === 'discover' && (
+        <View style={[styles.searchContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search communities"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
 
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Suggested Communities</Text>
+        
+      )}
+      
+      {/* Create Community Button - chỉ hiển thị khi đang ở tab Discover */}
+{activeTab === 'discover' && (
+  <TouchableOpacity
+    style={[
+      styles.createButton,
+      {
+        backgroundColor: isPro ? colors.primary : colors.border,
+        borderColor: isPro ? colors.primary : colors.border,
+      },
+    ]}
+    onPress={handleCreateCommunity}
+  >
+    <Ionicons name="add-circle-outline" size={20} color={isPro ? '#fff' : colors.textMuted} />
+    <Text style={[styles.createButtonText, { color: isPro ? '#fff' : colors.textMuted }]}>
+      {isPro ? 'Create Community' : 'Create Community (PRO)'}
+    </Text>
+  </TouchableOpacity>
+)}
+
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
@@ -145,7 +230,7 @@ export default function DiscussionScreen() {
         </View>
       ) : (
         <FlatList
-          data={communities}
+          data={currentCommunities}
           renderItem={renderCommunityCard}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
@@ -155,7 +240,19 @@ export default function DiscussionScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={64} color={colors.disabled} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No communities yet</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                {activeTab === 'my-communities' 
+                  ? 'You haven\'t joined any communities yet' 
+                  : 'No communities found'}
+              </Text>
+              {activeTab === 'my-communities' && (
+                <TouchableOpacity
+                  style={[styles.discoverButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setActiveTab('discover')}
+                >
+                  <Text style={styles.discoverButtonText}>Discover Communities</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
@@ -175,6 +272,25 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -265,6 +381,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  discoverButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  discoverButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

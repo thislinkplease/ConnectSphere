@@ -21,7 +21,7 @@ import { useAuth } from '@/src/context/AuthContext';
 import communityService from '@/src/services/communityService';
 import type { Community, CommunityJoinRequest } from '@/src/types';
 
-type TabType = 'settings' | 'members' | 'requests';
+type TabType = 'settings' | 'members' | 'posts' | 'requests';
 
 interface MemberWithUser {
   username: string;
@@ -45,6 +45,7 @@ export default function CommunitySettingsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [community, setCommunity] = useState<Community | null>(null);
   const [members, setMembers] = useState<MemberWithUser[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [joinRequests, setJoinRequests] = useState<CommunityJoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -85,6 +86,18 @@ export default function CommunitySettingsScreen() {
     }
   }, [communityId]);
 
+  const loadPosts = useCallback(async () => {
+    try {
+      const data = await communityService.getCommunityPosts(communityId, { 
+        limit: 50,
+        viewer: user?.username 
+      });
+      setPosts(data);
+    } catch (error) {
+      console.error('Error loading posts:', error);
+    }
+  }, [communityId, user?.username]);
+
   const loadJoinRequests = useCallback(async () => {
     if (!user?.username || !isAdmin) return;
     try {
@@ -102,10 +115,12 @@ export default function CommunitySettingsScreen() {
   useEffect(() => {
     if (activeTab === 'members') {
       loadMembers();
+    } else if (activeTab === 'posts') {
+      loadPosts();
     } else if (activeTab === 'requests') {
       loadJoinRequests();
     }
-  }, [activeTab, loadMembers, loadJoinRequests]);
+  }, [activeTab, loadMembers, loadPosts, loadJoinRequests]);
 
   const handleSaveSettings = async () => {
     if (!user?.username || !isAdmin) return;
@@ -232,6 +247,32 @@ export default function CommunitySettingsScreen() {
     );
   };
 
+  const handleDeletePost = async (post: any) => {
+    if (!user?.username || !isAdmin) return;
+
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await communityService.deleteCommunityPost(communityId, post.id, user.username);
+              Alert.alert('Success', 'Post deleted successfully');
+              loadPosts();
+            } catch (error) {
+              console.error('Error deleting post:', error);
+              Alert.alert('Error', 'Failed to delete post');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleReviewRequest = async (request: CommunityJoinRequest, action: 'approve' | 'reject') => {
     if (!user?.username || !isAdmin) return;
 
@@ -286,6 +327,50 @@ export default function CommunitySettingsScreen() {
           <Ionicons name="ellipsis-vertical" size={20} color={colors.textMuted} />
         </TouchableOpacity>
       )}
+    </View>
+  );
+
+  const renderPost = ({ item }: { item: any }) => (
+    <View style={[styles.postItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.postHeader}>
+        <View style={styles.postAuthor}>
+          <Text style={[styles.postAuthorName, { color: colors.text }]}>
+            {item.authorDisplayName || item.author_username}
+          </Text>
+          <Text style={[styles.postDate, { color: colors.textMuted }]}>
+            {new Date(item.created_at).toLocaleDateString()}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => handleDeletePost(item)}>
+          <Ionicons name="trash-outline" size={20} color={colors.error || '#EF4444'} />
+        </TouchableOpacity>
+      </View>
+      {item.content && (
+        <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
+          {item.content}
+        </Text>
+      )}
+      {item.post_media && item.post_media.length > 0 && (
+        <Image 
+          source={{ uri: item.post_media[0].media_url }} 
+          style={styles.postImage}
+          resizeMode="cover"
+        />
+      )}
+      <View style={styles.postStats}>
+        <View style={styles.statItem}>
+          <Ionicons name="heart" size={16} color={colors.textMuted} />
+          <Text style={[styles.statText, { color: colors.textMuted }]}>
+            {item.like_count || 0}
+          </Text>
+        </View>
+        <View style={styles.statItem}>
+          <Ionicons name="chatbubble" size={16} color={colors.textMuted} />
+          <Text style={[styles.statText, { color: colors.textMuted }]}>
+            {item.comment_count || 0}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -366,7 +451,11 @@ export default function CommunitySettingsScreen() {
       </View>
 
       {/* Tabs */}
-      <View style={[styles.tabs, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={[styles.tabs, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
+      >
         <TouchableOpacity
           style={[styles.tab, activeTab === 'settings' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
           onPress={() => setActiveTab('settings')}
@@ -383,6 +472,14 @@ export default function CommunitySettingsScreen() {
             Members
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'posts' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
+          onPress={() => setActiveTab('posts')}
+        >
+          <Text style={[styles.tabText, activeTab === 'posts' && [styles.activeTabText, { color: colors.primary }]]}>
+            Posts
+          </Text>
+        </TouchableOpacity>
         {isPrivate && (
           <TouchableOpacity
             style={[styles.tab, activeTab === 'requests' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
@@ -393,7 +490,7 @@ export default function CommunitySettingsScreen() {
             </Text>
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
 
       {/* Content */}
       {activeTab === 'settings' && (
@@ -487,6 +584,21 @@ export default function CommunitySettingsScreen() {
             <View style={styles.emptyContainer}>
               <Ionicons name="people-outline" size={64} color={colors.disabled} />
               <Text style={[styles.emptyText, { color: colors.textMuted }]}>No members yet</Text>
+            </View>
+          }
+        />
+      )}
+
+      {activeTab === 'posts' && (
+        <FlatList
+          data={posts}
+          renderItem={renderPost}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="document-text-outline" size={64} color={colors.disabled} />
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No posts yet</Text>
             </View>
           }
         />
@@ -734,5 +846,51 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     marginTop: 16,
+  },
+  postItem: {
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  postAuthor: {
+    flex: 1,
+  },
+  postAuthorName: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  postDate: {
+    fontSize: 12,
+  },
+  postContent: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  postStats: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: 13,
   },
 });
