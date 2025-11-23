@@ -49,7 +49,7 @@ export default function PostScreen() {
         setCommunity(c as any);
         // Check if user is a member
         setIsMember(c.is_member || false);
-        
+
         // If not a member, show alert and go back
         if (!c.is_member) {
           Alert.alert(
@@ -111,7 +111,7 @@ export default function PostScreen() {
       // BE /communities/:id/posts chỉ nhận 1 file "image"
       const first = selectedMedia[0];
 
-      await communityService.createCommunityPost(communityId, {
+      const res = await communityService.createCommunityPost(communityId, {
         authorUsername: meUsername,
         content: caption || undefined,
         image: first ? ({
@@ -124,11 +124,15 @@ export default function PostScreen() {
         hideLikeCount,
       });
 
-      Alert.alert('Đã đăng', 'Bài viết đã được tạo trong cộng đồng.');
+      if (res.status === 'pending') {
+        Alert.alert('Pending Approval', 'Your post has been submitted and is pending approval from admins.');
+      } else {
+        Alert.alert('Success', 'Post created successfully.');
+      }
       router.back();
     } catch (e) {
       console.error(e);
-      Alert.alert('Lỗi', 'Đăng bài không thành công.');
+      Alert.alert('Error', 'Failed to create post.');
     }
   };
 
@@ -177,9 +181,9 @@ export default function PostScreen() {
         </View>
       </View>
 
-      <Button 
-        mode="contained" 
-        onPress={onSubmit} 
+      <Button
+        mode="contained"
+        onPress={onSubmit}
         style={styles.submitBtn}
         disabled={checkingMembership || !isMember}
       >

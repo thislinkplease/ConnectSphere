@@ -39,7 +39,7 @@ export default function CommunityChatScreen() {
   const communityId = Number(params.id);
   const communityName = params.name || 'Community Chat';
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   const [messages, setMessages] = useState<CommunityMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -53,13 +53,13 @@ export default function CommunityChatScreen() {
   // Load initial messages
   const loadMessages = useCallback(async () => {
     if (!user?.username) return;
-    
+
     try {
       setLoading(true);
       const response = await ApiService.client.get(`/communities/${communityId}/chat/messages`, {
         params: { viewer: user.username, limit: 50 },
       });
-      
+
       const msgs = response.data.map((m: any) => ({
         id: String(m.id),
         communityId,
@@ -69,9 +69,9 @@ export default function CommunityChatScreen() {
         created_at: m.created_at,
         sender: m.sender,
       }));
-      
+
       setMessages(msgs);
-      
+
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: false });
       }, 100);
@@ -87,9 +87,9 @@ export default function CommunityChatScreen() {
     if (!user?.username) return;
 
     const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-    
-    if (!WebSocketService.isConnected()) {
-      WebSocketService.connect(apiUrl, user.username);
+
+    if (!WebSocketService.isConnected() && token) {
+      WebSocketService.connect(apiUrl, token);
       setTimeout(() => {
         if (WebSocketService.isConnected()) {
           WebSocketService.joinCommunityChat(communityId);
@@ -206,11 +206,11 @@ export default function CommunityChatScreen() {
     const isOwnMessage = item.sender_username === user?.username;
     const senderName = item.sender?.name || item.sender_username;
     const senderAvatar = item.sender?.avatar;
-    
+
     // Check if this is the first message from this sender in a group
     const prevMessage = index > 0 ? messages[index - 1] : null;
     const isFirstInGroup = !prevMessage || prevMessage.sender_username !== item.sender_username;
-    
+
     // Check if this is the last message from this sender in a group
     const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
     const isLastInGroup = !nextMessage || nextMessage.sender_username !== item.sender_username;

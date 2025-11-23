@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -68,9 +70,9 @@ export default function CommunityScreen() {
         const c = await communityService.getCommunity(communityId, viewer);
         setCommunity(c);
 
-        const first = await communityService.getCommunityPosts(communityId, { 
-          limit: 10, 
-          viewer: me?.username 
+        const first = await communityService.getCommunityPosts(communityId, {
+          limit: 10,
+          viewer: me?.username
         });
         setPosts(first);
         cursorRef.current = first.length ? first[first.length - 1].created_at : null;
@@ -97,7 +99,7 @@ export default function CommunityScreen() {
       const c = await communityService.getCommunity(communityId, viewer);
       setCommunity(c);
 
-      const fresh = await communityService.getCommunityPosts(communityId, { 
+      const fresh = await communityService.getCommunityPosts(communityId, {
         limit: 10,
         viewer: me?.username
       });
@@ -142,23 +144,57 @@ export default function CommunityScreen() {
     try {
       await communityService.joinCommunity(communityId, me.username);
       setCommunity((prev) => prev ? { ...prev, is_member: true, member_count: (prev.member_count ?? 0) + 1 } : prev);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      if (e.message === 'REQUIRES_REQUEST') {
+        Alert.alert(
+          'Request Sent',
+          'This community requires approval. Your join request has been sent to the admins.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.error(e);
+        Alert.alert('Error', 'Failed to join community.');
+      }
     }
   }, [communityId, me?.username]);
 
   const onLeavePress = useCallback(async () => {
-    if (!communityId || !me?.username) return;
-    try {
-      await communityService.leaveCommunity(communityId, me.username);
-      setCommunity((prev) => prev ? { ...prev, is_member: false, member_count: Math.max(0, (prev.member_count ?? 0) - 1) } : prev);
-      // Clear posts when leaving since user can no longer see them
-      setPosts([]);
-      setHasMore(false);
-    } catch (e) {
-      console.error(e);
+    if (!communityId || !me?.username || !community) return;
+
+    // Check if owner
+    if (community.created_by === me.username) {
+      Alert.alert(
+        'Cannot Leave Community',
+        'You are the owner of this community. You cannot leave it. If you wish to delete the community, please go to Settings.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
-  }, [communityId, me?.username]);
+
+    Alert.alert(
+      'Leave Community',
+      'Are you sure you want to leave this community?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await communityService.leaveCommunity(communityId, me.username!);
+              setCommunity((prev) => prev ? { ...prev, is_member: false, member_count: Math.max(0, (prev.member_count ?? 0) - 1) } : prev);
+              // Clear posts when leaving since user can no longer see them
+              setPosts([]);
+              setHasMore(false);
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Failed to leave community.');
+            }
+          }
+        }
+      ]
+    );
+  }, [communityId, me?.username, community]);
 
   const onLikeToggle = useCallback(async (post: CommunityPost, isCurrentlyLiked: boolean) => {
     if (!me?.username) return;
@@ -177,93 +213,121 @@ export default function CommunityScreen() {
 
   const renderHeader = useMemo(() => {
     if (!community) return null;
-    
-    // Check if current user is admin/moderator
-    const isUserAdmin = me?.username && (
-      me.username === community.created_by ||
-      // We'll check this properly later when we fetch member role
-      false
-    );
-    
+
     return (
       <View style={{ backgroundColor: colors.card }}>
-        {/* TOP BANNER */}
-        {!!community.image_url && (
-          <Image source={{ uri: community.image_url }} style={styles.banner} />
-        )}
+        {/* TOP BANNER - Full Width 16:9 */}
+        <View style={styles.bannerContainer}>
+          {community.image_url ? (
+            <Image source={{ uri: community.image_url }} style={styles.banner} resizeMode="cover" />
+          ) : (
+            <View style={[styles.banner, { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="people" size={64} color="rgba(255,255,255,0.5)" />
+            </View>
+          )}
+          {/* Back Button Overlay */}
+          <Pressable style={styles.backButtonOverlay} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </Pressable>
+        </View>
 
-        {/* HEADER */}
+        {/* HEADER INFO */}
         <View style={[styles.headerBox, { backgroundColor: colors.card }]}>
-          <View style={styles.titleRow}>
-            <Text style={[styles.communityName, { color: colors.text }]}>{community.name}</Text>
+          <Text style={[styles.communityName, { color: colors.text }]}>{community.name}</Text>
+
+          <View style={styles.subInfoRow}>
+            <Ionicons name={community.is_private ? "lock-closed" : "globe"} size={14} color={colors.textSecondary} />
+            <Text style={[styles.subText, { color: colors.textSecondary }]}>
+              {community.is_private ? 'Private group' : 'Public group'} · {formatCount(community.member_count ?? 0)} members
+            </Text>
+          </View>
+
+          {/* ACTION BAR */}
+          <View style={styles.actionBar}>
+            {community.is_member ? (
+              <>
+                <Pressable style={[styles.actionBtn, styles.joinedBtn, { borderColor: colors.border }]} onPress={onLeavePress}>
+                  <Text style={[styles.btnText, { color: colors.text }]}>Joined</Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.text} />
+                </Pressable>
+                <Pressable style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => router.push(`/overview/post?communityId=${communityId}`)}>
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={[styles.btnText, { color: '#fff' }]}>Invite</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Pressable style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 1 }]} onPress={onJoinPress}>
+                <Text style={[styles.btnText, { color: '#fff', fontWeight: '600' }]}>Join Group</Text>
+              </Pressable>
+            )}
+
+            {/* Manage / Settings */}
             {me?.username === community.created_by && (
-              <Pressable 
-                style={styles.settingsButton}
+              <Pressable
+                style={[styles.iconBtn, { backgroundColor: colors.surface }]}
                 onPress={() => router.push({
                   pathname: '/overview/community-settings',
                   params: { id: String(communityId) },
                 })}
               >
-                <Ionicons name="settings-outline" size={24} color={colors.text} />
+                <Ionicons name="shield-checkmark" size={20} color={colors.text} />
               </Pressable>
             )}
-          </View>
-          <View style={styles.subInfoRow}>
-            <Ionicons name="globe-outline" size={16} color={colors.textSecondary} />
-            <Text style={[styles.subText, { color: colors.textSecondary }]}>
-              {community.is_private ? 'Private' : 'Public'} · {community.member_count ?? 0} members
-            </Text>
-          </View>
 
-          <View style={styles.btnRow}>
-            {community.is_member ? (
-              <>
-                <Pressable style={[styles.joinedBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onLeavePress}>
-                  <Ionicons name="checkmark-circle-outline" size={20} color={colors.text} />
-                  <Text style={[styles.joinedText, { color: colors.text }]}>Joined</Text>
-                </Pressable>
-                <Pressable 
-                  style={[styles.chatBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => router.push({
-                    pathname: '/overview/community-chat',
-                    params: { id: String(communityId), name: community.name },
-                  })}
-                >
-                  <Ionicons name="chatbubbles" size={20} color="#fff" />
-                  <Text style={styles.chatText}>Chat</Text>
-                </Pressable>
-              </>
-            ) : (
-              <Pressable style={[styles.inviteBtn, { backgroundColor: colors.primary }]} onPress={onJoinPress}>
-                <Ionicons name="person-add-outline" size={20} color="#fff" />
-                <Text style={styles.inviteText}>Join</Text>
+            {/* Chat Button */}
+            {community.is_member && (
+              <Pressable
+                style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+                onPress={() => router.push({
+                  pathname: '/overview/community-chat',
+                  params: { id: String(communityId), name: community.name },
+                })}
+              >
+                <Ionicons name="chatbubble-ellipses" size={20} color={colors.text} />
               </Pressable>
             )}
           </View>
         </View>
 
-        {/* POST INPUT - Only show for members */}
+        {/* TABS */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsContainer, { borderBottomColor: colors.border }]}>
+          {['Discussion', 'Featured', 'People', 'Events', 'Media', 'Files'].map((tab) => (
+            <Pressable key={tab} style={[styles.tabItem, tab === 'Discussion' && styles.activeTabItem]}>
+              <Text style={[styles.tabText, { color: tab === 'Discussion' ? colors.primary : colors.textSecondary }]}>{tab}</Text>
+              {tab === 'Discussion' && <View style={[styles.activeIndicator, { backgroundColor: colors.primary }]} />}
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* COMPOSER (Only for members) */}
         {community.is_member && (
-          <View style={[styles.postBox, { backgroundColor: colors.card }]}>
-            <Image
-              source={{ uri: me?.avatar || 'https://i.pravatar.cc/100' }}
-              style={styles.avatar}
-            />
+          <View style={[styles.composerBox, { backgroundColor: colors.card }]}>
+            {me?.avatar ? (
+              <Image source={{ uri: me.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="person" size={24} color="#fff" />
+              </View>
+            )}
             <Pressable
-              style={[styles.postInput, { borderColor: colors.border, backgroundColor: colors.surface }]}
+              style={[styles.composerInput, { backgroundColor: colors.surface }]}
               onPress={() => router.push(`/overview/post?communityId=${communityId}`)}
             >
-              <Text style={{ color: colors.textMuted }}>What&apos;s on your mind?</Text>
+              <Text style={{ color: colors.textMuted }}>Write something...</Text>
             </Pressable>
+            <Ionicons name="images-outline" size={24} color={colors.primary} style={{ marginLeft: 8 }} />
           </View>
         )}
 
-        {/* Private community message for non-members */}
+        {/* Private Notice */}
         {community.is_private && !community.is_member && (
-          <View style={[styles.privateNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} />
-            <Text style={[styles.privateNoticeText, { color: colors.textSecondary }]}>
-              This is a private community. Join to see posts and participate in discussions.
+          <View style={[styles.privateNotice, { backgroundColor: colors.surface }]}>
+            <View style={styles.lockIconCircle}>
+              <Ionicons name="lock-closed" size={24} color={colors.text} />
+            </View>
+            <Text style={[styles.privateTitle, { color: colors.text }]}>This group is private</Text>
+            <Text style={[styles.privateDesc, { color: colors.textSecondary }]}>
+              Join this group to view or participate in discussions.
             </Text>
           </View>
         )}
@@ -271,7 +335,7 @@ export default function CommunityScreen() {
         <View style={[styles.separator, { backgroundColor: colors.surfaceVariant }]} />
       </View>
     );
-  }, [community, me?.avatar, onJoinPress, onLeavePress, router, communityId, colors]);
+  }, [community, me?.avatar, onJoinPress, onLeavePress, router, communityId, colors, me?.username]);
 
   const renderItem = useCallback(({ item }: { item: CommunityPost }) => {
     return (
@@ -332,46 +396,76 @@ export default function CommunityScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  banner: { width: '100%', height: 200, backgroundColor: '#ddd' },
-  headerBox: { padding: 16 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  communityName: { fontSize: 22, fontWeight: '700', flex: 1 },
-  settingsButton: { padding: 4, marginLeft: 8 },
-  subInfoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  subText: { marginLeft: 6, fontSize: 14 },
-  btnRow: { flexDirection: 'row', marginTop: 16, gap: 12 },
-  joinedBtn: {
+  bannerContainer: { width: '100%', height: 220, position: 'relative' },
+  banner: { width: '100%', height: '100%' },
+  backButtonOverlay: {
+    position: 'absolute', top: 40, left: 16,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  headerBox: { padding: 16, paddingBottom: 8 },
+  communityName: { fontSize: 26, fontWeight: '800', marginBottom: 4 },
+  subInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 6 },
+  subText: { fontSize: 14, fontWeight: '500' },
+
+  actionBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  actionBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8,
+    gap: 6,
+  },
+  joinedBtn: { borderWidth: 1, backgroundColor: 'transparent' },
+  btnText: { fontSize: 15, fontWeight: '600' },
+  iconBtn: {
+    width: 40, height: 40, borderRadius: 8,
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+  },
+  tabItem: {
+    paddingVertical: 12,
+    marginRight: 24,
+    position: 'relative',
+  },
+  activeTabItem: {},
+  tabText: { fontSize: 15, fontWeight: '600' },
+  activeIndicator: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
+    borderTopLeftRadius: 3, borderTopRightRadius: 3,
+  },
+
+  composerBox: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1,
+    padding: 16, gap: 12,
   },
-  joinedText: { fontSize: 15, marginLeft: 6 },
-  inviteBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8,
+  avatar: { width: 40, height: 40, borderRadius: 20 },
+  composerInput: {
+    flex: 1, borderRadius: 20,
+    paddingVertical: 10, paddingHorizontal: 16,
+    borderWidth: 1, borderColor: 'transparent', // Subtle look
   },
-  inviteText: { color: '#fff', marginLeft: 6, fontSize: 15 },
-  chatBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8,
+
+  privateNotice: {
+    alignItems: 'center', padding: 32,
+    gap: 12,
   },
-  chatText: { color: '#fff', marginLeft: 6, fontSize: 15 },
-  postBox: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 10 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#ccc' },
-  postInput: { flex: 1, borderWidth: 1, borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16 },
-  privateNotice: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 16, 
-    gap: 12, 
-    marginHorizontal: 16, 
-    marginVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
+  lockIconCircle: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center',
   },
-  privateNoticeText: { 
-    flex: 1, 
-    fontSize: 14, 
-    lineHeight: 20,
-  },
-  separator: { height: 7, width: '100%' },
+  privateTitle: { fontSize: 18, fontWeight: '700' },
+  privateDesc: { fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+
+  separator: { height: 8, width: '100%' },
 });
+
+function formatCount(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}

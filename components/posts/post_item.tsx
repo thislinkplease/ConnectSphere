@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
+import { View, Text, Image, StyleSheet, Pressable, ScrollView, Dimensions, Alert } from 'react-native';
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { formatCount, formatToVietnamTime } from '@/src/utils/date';
@@ -47,7 +47,7 @@ export default function PostItem({
   initialIsLiked,
   showFollowButton = false,
   isFollowingAuthor = false,
-  onFollowClick = () => {},
+  onFollowClick = () => { },
   showMoreMenu = true,
 }: PostItemProps) {
   const router = useRouter();
@@ -184,23 +184,41 @@ function actionSheet(
   onEditClick?: (post: Post) => void,
   onDeleteClick?: (post: Post) => void
 ) {
-  const choice = typeof window !== 'undefined' ? window.prompt('Type: edit | delete') : null;
-  if (choice === 'edit') onEditClick?.(post);
-  if (choice === 'delete') onDeleteClick?.(post);
+  Alert.alert(
+    'Post Options',
+    'Choose an action',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Edit',
+        onPress: () => onEditClick?.(post)
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => onDeleteClick?.(post)
+      },
+    ]
+  );
 }
 
 const styles = StyleSheet.create({
   card: {
     width: '100%',
     backgroundColor: '#fff',
-    paddingBottom: 16,
+    marginBottom: 10, // Spacing between cards
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 12,
+    gap: 10,
   },
   avatar: {
     width: 40,
@@ -214,52 +232,64 @@ const styles = StyleSheet.create({
   },
   username: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#111',
+    fontWeight: '700',
+    color: '#050505', // Facebook black
   },
   inCommunity: {
     fontSize: 13,
-    fontStyle: 'italic',
-    color: '#777',
+    color: '#65676B', // Facebook gray
+    fontWeight: '400',
   },
+  timeAgo: {
+    fontSize: 12,
+    color: '#65676B',
+    marginTop: 2,
+  },
+
+  captionWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  captionUser: { fontSize: 15, fontWeight: '600', color: '#050505' },
+  captionText: { fontSize: 15, color: '#050505', lineHeight: 20 },
+
   singleMedia: {
     width: '100%',
-    height: 360,
+    height: 400, // Taller for better visibility
+    backgroundColor: '#f0f2f5',
   },
   multiMedia: {
-    width: SCREEN_WIDTH * 0.88,
-    height: 320,
-    borderRadius: 10,
-    marginRight: 10,
-    backgroundColor: '#ddd',
+    width: SCREEN_WIDTH * 0.8,
+    height: 350,
+    borderRadius: 8,
+    marginRight: 8,
+    backgroundColor: '#f0f2f5',
   },
+
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between', // Spread out like FB
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E4E6EB',
   },
   action: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1, // Equal width buttons
+    gap: 6,
+    paddingVertical: 4,
   },
   actionCount: {
-    marginLeft: 6,
     fontSize: 14,
-    color: '#111',
-    fontWeight: '500',
+    color: '#65676B',
+    fontWeight: '600',
   },
-  captionWrap: {
-    paddingHorizontal: 16,
-    marginTop: 8,
-    gap: 6,
-  },
-  captionUser: { fontSize: 14, fontWeight: '600', color: '#111' },
-  captionText: { fontSize: 14, color: '#111' },
-  timeAgo: { fontSize: 12, color: '#6B7280' },
+
   divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginTop: 16,
+    height: 0, // Removed divider, using marginBottom on card instead
   },
 });

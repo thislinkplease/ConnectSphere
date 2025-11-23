@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/context/AuthContext';
+import { formatAuthError } from '@/src/utils/auth-helper';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -23,9 +24,10 @@ export default function LoginScreen() {
     try {
       await login(email, password);
       router.replace('/(tabs)/hangout');
-    } catch (error) {
-      Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
+    } catch (error: any) {
       console.error('Login error:', error);
+      const errorMessage = formatAuthError(error);
+      Alert.alert('Login Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }

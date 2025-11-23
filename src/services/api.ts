@@ -56,7 +56,7 @@ class ApiService {
     // Add request interceptor for logging and deduplication
     this.client.interceptors.request.use(
       (config) => {
-    
+
         return config;
       },
       (error) => {
@@ -72,11 +72,11 @@ class ApiService {
       },
       async (error) => {
         const originalRequest = error.config;
-        
+
         if (error.response) {
           // Server responded with error
           console.error('API Response Error:', error.response.status, error.response.data);
-          
+
           // If 401 Unauthorized, user might need to re-login
           if (error.response.status === 401 && !originalRequest._retry) {
             console.warn('Unauthorized - Token may be expired');
@@ -85,12 +85,12 @@ class ApiService {
         } else if (error.request) {
           // Request made but no response - possibly network issue
           console.error('API No Response:', error.message);
-          
+
           // Retry once for network errors
           if (!originalRequest._retry) {
             originalRequest._retry = true;
             try {
-     
+
               return this.client(originalRequest);
             } catch (retryError) {
               console.error('Retry failed:', retryError);
@@ -118,14 +118,14 @@ class ApiService {
     // Only deduplicate GET requests (safe for read operations)
     const cacheKey = `GET:${url}:${JSON.stringify(params || {})}`;
     const now = Date.now();
-    
+
     // Check if there's a pending request for the same endpoint
     const pending = pendingRequests.get(cacheKey);
     if (pending && (now - pending.timestamp) < REQUEST_CACHE_DURATION) {
- 
+
       return pending.promise;
     }
-    
+
     // Create new request
     const promise = this.client.get(url, { params }).then(response => {
       // Clean up from pending requests after completion
@@ -136,10 +136,10 @@ class ApiService {
       pendingRequests.delete(cacheKey);
       throw error;
     });
-    
+
     // Store pending request
     pendingRequests.set(cacheKey, { promise, timestamp: now });
-    
+
     return promise;
   }
 
@@ -158,6 +158,11 @@ class ApiService {
       ...response.data,
       user: mapServerUserToClient(response.data.user),
     };
+  }
+
+  async createProfile(data: any): Promise<User> {
+    const response = await this.client.post('/users/create-profile', data);
+    return mapServerUserToClient(response.data);
   }
 
   async logout(): Promise<void> {
@@ -210,7 +215,7 @@ class ApiService {
     });
   }
 
-  
+
   async getUsers(filters?: ConnectionFilters): Promise<User[]> {
     const data: any[] = await this.deduplicatedGet('/users', filters);
     return (data || []).map(mapServerUserToClient);
@@ -313,7 +318,7 @@ class ApiService {
     }
   }
 
-   // Create or get existing direct conversation with otherUsername
+  // Create or get existing direct conversation with otherUsername
   async createOrGetDirectConversation(currentUsername: string, otherUsername: string): Promise<{ id: string | number }> {
     const response = await this.client.post('/messages/conversations', {
       type: 'dm',
@@ -393,7 +398,7 @@ class ApiService {
 
   // Hangout endpoints
   async getOpenHangouts(params?: {
-    languages?: string[];    
+    languages?: string[];
     distance_km?: number;
     user_lat?: number;
     user_lng?: number;
@@ -406,26 +411,26 @@ class ApiService {
       user_lng: params?.user_lng,
       limit: params?.limit,
     });
-    
+
     // Map server user data to client format, ensuring we have an array
     if (!users || !Array.isArray(users)) {
       console.warn('getOpenHangouts: Invalid response, expected array:', users);
       return [];
     }
-    
+
     // Debug: Log raw server response
-   
+
     if (users.length > 0) {
 
     }
-    
+
     const mappedUsers = users.map((user: any) => mapServerUserToClient(user));
-    
+
     // Debug: Log mapped response
     if (mappedUsers.length > 0) {
-     
+
     }
-    
+
     return mappedUsers;
   }
 
@@ -480,36 +485,37 @@ class ApiService {
       const lastRaw = c.last_message;
       const lastMessage = lastRaw
         ? {
-            id: String(lastRaw.id),
-            chatId: String(lastRaw.conversation_id ?? c.id),
-            senderId: lastRaw.sender_username,
-            sender: mapServerUserToClient({
-              id: lastRaw.sender?.id ?? lastRaw.sender_username,
-              username: lastRaw.sender?.username ?? lastRaw.sender_username,
-              name: lastRaw.sender?.name ?? lastRaw.sender_username,
-              avatar: lastRaw.sender?.avatar ?? '',
-              email: (lastRaw.sender?.username || 'unknown') + '@example.com',
-              country: lastRaw.sender?.country || '',
-              city: lastRaw.sender?.city || '',
-              status: lastRaw.sender?.status || 'Chilling',
-              languages: lastRaw.sender?.languages || [],
-              interests: lastRaw.sender?.interests || [],
-              followers: lastRaw.sender?.followers,
-              following: lastRaw.sender?.following,
-              posts: lastRaw.sender?.posts,
-            }),
-            content: lastRaw.content || '',
-            image: lastRaw.message_media?.[0]?.media_url,
-            timestamp: lastRaw.created_at, 
-            read: lastRaw.is_read || false,
-          }
+          id: String(lastRaw.id),
+          chatId: String(lastRaw.conversation_id ?? c.id),
+          senderId: lastRaw.sender_username,
+          sender: mapServerUserToClient({
+            id: lastRaw.sender?.id ?? lastRaw.sender_username,
+            username: lastRaw.sender?.username ?? lastRaw.sender_username,
+            name: lastRaw.sender?.name ?? lastRaw.sender_username,
+            avatar: lastRaw.sender?.avatar ?? '',
+            email: (lastRaw.sender?.username || 'unknown') + '@example.com',
+            country: lastRaw.sender?.country || '',
+            city: lastRaw.sender?.city || '',
+            status: lastRaw.sender?.status || 'Chilling',
+            languages: lastRaw.sender?.languages || [],
+            interests: lastRaw.sender?.interests || [],
+            followers: lastRaw.sender?.followers,
+            following: lastRaw.sender?.following,
+            posts: lastRaw.sender?.posts,
+          }),
+          content: lastRaw.content || '',
+          image: lastRaw.message_media?.[0]?.media_url,
+          timestamp: lastRaw.created_at,
+          read: lastRaw.is_read || false,
+        }
         : undefined;
 
       // map dm -> user to match client type
-      const mappedType: 'event' | 'user' | 'group' =
+      const mappedType: 'event' | 'user' | 'group' | 'community' =
         c.type === 'group' ? 'group'
-        : c.type === 'event' ? 'event'
-        : 'user';
+          : c.type === 'event' ? 'event'
+            : c.type === 'community' ? 'community'
+              : 'user';
 
       // For DM conversations, use other_participant from server if available
       if (mappedType === 'user' && c.other_participant) {
@@ -614,33 +620,33 @@ class ApiService {
     };
   }
 
- async getChatMessages(conversationId: string): Promise<Message[]> {
-   const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
-   return response.data.map((m: any) => ({
-     id: String(m.id),
-     chatId: String(m.conversation_id ?? conversationId),
-     senderId: m.sender_username ?? m.sender?.username,
-     sender: mapServerUserToClient({
-       id: m.sender?.id ?? m.sender_username,
-       username: m.sender?.username ?? m.sender_username,
-       name: m.sender?.name ?? m.sender_username,
-       email: m.sender?.email ?? `${m.sender_username}@example.com`,
-       avatar: m.sender?.avatar ?? '',
-       country: m.sender?.country ?? '',
-       city: m.sender?.city ?? '',
-       status: m.sender?.status ?? 'Chilling',
-       languages: m.sender?.languages ?? [],
-       interests: m.sender?.interests ?? [],
-       bio: m.sender?.bio,
-       gender: m.sender?.gender,
-       age: m.sender?.age,
-     }),
-     content: m.content ?? '',
-     image: m.message_media?.[0]?.media_url ?? m.image,
-     timestamp: m.created_at ?? m.timestamp,
-     read: m.is_read ?? m.read ?? false,
-   }));
- }
+  async getChatMessages(conversationId: string): Promise<Message[]> {
+    const response = await this.client.get(`/messages/conversations/${conversationId}/messages`);
+    return response.data.map((m: any) => ({
+      id: String(m.id),
+      chatId: String(m.conversation_id ?? conversationId),
+      senderId: m.sender_username ?? m.sender?.username,
+      sender: mapServerUserToClient({
+        id: m.sender?.id ?? m.sender_username,
+        username: m.sender?.username ?? m.sender_username,
+        name: m.sender?.name ?? m.sender_username,
+        email: m.sender?.email ?? `${m.sender_username}@example.com`,
+        avatar: m.sender?.avatar ?? '',
+        country: m.sender?.country ?? '',
+        city: m.sender?.city ?? '',
+        status: m.sender?.status ?? 'Chilling',
+        languages: m.sender?.languages ?? [],
+        interests: m.sender?.interests ?? [],
+        bio: m.sender?.bio,
+        gender: m.sender?.gender,
+        age: m.sender?.age,
+      }),
+      content: m.content ?? '',
+      image: m.message_media?.[0]?.media_url ?? m.image,
+      timestamp: m.created_at ?? m.timestamp,
+      read: m.is_read ?? m.read ?? false,
+    }));
+  }
 
   async sendMessage(conversationId: string, senderUsername: string, content: string, replyToMessageId?: string): Promise<void> {
     await this.client.post(`/messages/conversations/${conversationId}/messages`, {
@@ -709,16 +715,16 @@ class ApiService {
 
   // Pro subscription endpoints
   async createPaymentIntent(username: string, amount: number = 1): Promise<{ clientSecret: string; paymentIntentId: string }> {
-    const response = await this.client.post('/payments/create-payment-intent', { 
-      username, 
-      amount 
+    const response = await this.client.post('/payments/create-payment-intent', {
+      username,
+      amount
     });
     return response.data;
   }
 
   async activateProSubscription(username: string, paymentIntentId?: string): Promise<void> {
-    await this.client.post('/payments/subscribe', { 
-      username, 
+    await this.client.post('/payments/subscribe', {
+      username,
       plan_type: 'pro',
       payment_method: paymentIntentId ? 'stripe' : 'test',
       payment_intent_id: paymentIntentId
@@ -732,9 +738,9 @@ class ApiService {
   async getProStatus(username: string): Promise<{ isPro: boolean; expiresAt?: string }> {
     try {
       const subscription: any = await this.deduplicatedGet('/payments/subscription', { username });
-      return { 
+      return {
         isPro: subscription?.plan_type === 'pro' && subscription?.status === 'active',
-        expiresAt: subscription?.end_date 
+        expiresAt: subscription?.end_date
       };
     } catch (error) {
       console.error('Error getting pro status:', error);
@@ -742,7 +748,51 @@ class ApiService {
     }
   }
 
-  // Community/Discussion endpoints
+  async updateCommunity(communityId: string, data: any): Promise<Community> {
+    const response = await this.client.put(`/communities/${communityId}`, data);
+    return response.data;
+  }
+
+  async deleteCommunity(communityId: string): Promise<void> {
+    await this.client.delete(`/communities/${communityId}`);
+  }
+
+  // Community Member Management
+  async getCommunityMembers(communityId: string): Promise<any[]> {
+    const response = await this.client.get(`/communities/${communityId}/members`);
+    return response.data.map((m: any) => ({
+      ...m,
+      user: m.user ? mapServerUserToClient(m.user) : null,
+    }));
+  }
+
+  async getJoinRequests(communityId: string): Promise<any[]> {
+    const response = await this.client.get(`/communities/${communityId}/join_requests`);
+    return response.data.map((r: any) => ({
+      ...r,
+      user: r.user ? mapServerUserToClient(r.user) : null,
+    }));
+  }
+
+  async approveJoinRequest(communityId: string, username: string): Promise<void> {
+    await this.client.post(`/communities/${communityId}/join_requests/${username}/approve`);
+  }
+
+  async rejectJoinRequest(communityId: string, username: string): Promise<void> {
+    await this.client.post(`/communities/${communityId}/join_requests/${username}/reject`);
+  }
+
+  async updateMemberRole(communityId: string, username: string, role: 'admin' | 'moderator' | 'member'): Promise<void> {
+    await this.client.put(`/communities/${communityId}/members/${username}/role`, { role });
+  }
+
+  async kickMember(communityId: string, username: string): Promise<void> {
+    await this.client.delete(`/communities/${communityId}/members/${username}`);
+  }
+
+  async banMember(communityId: string, username: string): Promise<void> {
+    await this.client.post(`/communities/${communityId}/members/${username}/ban`);
+  }
   async getCommunities(query?: string, limit?: number): Promise<Community[]> {
     const response = await this.client.get('/communities', { params: { q: query, limit } });
     return response.data;
@@ -793,6 +843,26 @@ class ApiService {
       content,
       parent_id: parentId,
     });
+  }
+
+  async getPendingPosts(communityId: string): Promise<Post[]> {
+    const response = await this.client.get(`/communities/${communityId}/posts/pending`);
+    return response.data.map((p: any) => ({
+      ...p,
+      author: p.author_display_name ? {
+        username: p.author_username,
+        name: p.author_display_name,
+        avatar: p.author_avatar,
+      } : undefined,
+    }));
+  }
+
+  async approvePost(communityId: string, postId: string): Promise<void> {
+    await this.client.post(`/communities/${communityId}/posts/${postId}/approve`);
+  }
+
+  async rejectPost(communityId: string, postId: string): Promise<void> {
+    await this.client.post(`/communities/${communityId}/posts/${postId}/reject`);
   }
 
   // Notification endpoints

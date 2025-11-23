@@ -71,87 +71,87 @@ export default function CommentsSheet(props: CommentsSheetProps) {
 
   // load comments
   useEffect(() => {
-  if (!visible) return;
+    if (!visible) return;
 
-  (async () => {
-    setLoading(true);
+    (async () => {
+      setLoading(true);
 
-    try {
-      const all: Comment[] = await communityService.getAllPostComments(
-        communityId,
-        postId
-      );
+      try {
+        const all: Comment[] = await communityService.getAllPostComments(
+          communityId,
+          postId
+        );
 
-      const roots: Comment[] = all.filter(
-        (c: Comment) => c.parent_id === null
-      );
+        const roots: Comment[] = all.filter(
+          (c: Comment) => c.parent_id === null
+        );
 
-      const newRepliesMap: Record<number, Comment[]> = {};
+        const newRepliesMap: Record<number, Comment[]> = {};
 
-      for (const root of roots) {
-        newRepliesMap[root.id] = all.filter((c: Comment) => {
-          const isChildOfRoot = c.parent_id === root.id;
-          const isChildOfReply = all.some(
-            (rc: Comment) =>
-              rc.parent_id === root.id && c.parent_id === rc.id
-          );
+        for (const root of roots) {
+          newRepliesMap[root.id] = all.filter((c: Comment) => {
+            const isChildOfRoot = c.parent_id === root.id;
+            const isChildOfReply = all.some(
+              (rc: Comment) =>
+                rc.parent_id === root.id && c.parent_id === rc.id
+            );
 
-          return isChildOfRoot || isChildOfReply;
-        });
-      }
-
-      setRootComments(roots);
-      setRepliesMap(newRepliesMap);
-
-      const initVisible: Record<number, number> = {};
-      for (const root of roots) {
-        const replyCount = newRepliesMap[root.id]?.length ?? 0;
-        initVisible[root.id] = Math.min(1, replyCount);
-      }
-      setVisibleReplies(initVisible);
-
-
-      const usernames = Array.from(
-        new Set(all.map((c: Comment) => c.author_username))
-      );
-
-      for (const username of usernames) {
-        if (userData[username]) continue;
-
-        try {
-          const user = await ApiService.getUserByUsername(username);
-
-          setUserData((prev) => ({
-            ...prev,
-            [username]: {
-              name: user.name || username,
-              avatar: user.avatar ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  user.name || username
-                )}&background=random`,
-            },
-          }));
-        } catch (err) {
-          console.log("Failed loading user:", username);
-
-          setUserData((prev) => ({
-            ...prev,
-            [username]: {
-              name: username,
-              avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                username
-              )}&background=random`,
-            },
-          }));
+            return isChildOfRoot || isChildOfReply;
+          });
         }
+
+        setRootComments(roots);
+        setRepliesMap(newRepliesMap);
+
+        const initVisible: Record<number, number> = {};
+        for (const root of roots) {
+          const replyCount = newRepliesMap[root.id]?.length ?? 0;
+          initVisible[root.id] = Math.min(1, replyCount);
+        }
+        setVisibleReplies(initVisible);
+
+
+        const usernames = Array.from(
+          new Set(all.map((c: Comment) => c.author_username))
+        );
+
+        for (const username of usernames) {
+          if (userData[username]) continue;
+
+          try {
+            const user = await ApiService.getUserByUsername(username);
+
+            setUserData((prev) => ({
+              ...prev,
+              [username]: {
+                name: user.name || username,
+                avatar: user.avatar ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    user.name || username
+                  )}&background=random`,
+              },
+            }));
+          } catch (err) {
+            console.log("Failed loading user:", username);
+
+            setUserData((prev) => ({
+              ...prev,
+              [username]: {
+                name: username,
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  username
+                )}&background=random`,
+              },
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("Load comments error:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Load comments error:", err);
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, [visible, communityId, postId]);
+    })();
+  }, [visible, communityId, postId]);
 
 
   useEffect(() => {
@@ -173,7 +173,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
     if (!me?.username) return;
 
     const isOwnComment = comment.author_username === me.username;
-    
+
     if (isOwnComment) {
       Alert.alert(
         "Comment options",
@@ -441,7 +441,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
         />
 
         <View style={{ flex: 1 }}>
-          <Pressable 
+          <Pressable
             onLongPress={() => handleLongPressComment(item)}
             delayLongPress={200}
             style={styles.commentBubble}
@@ -544,10 +544,13 @@ export default function CommentsSheet(props: CommentsSheetProps) {
 
         {/* ===== INPUT BAR ===== */}
         <View style={[styles.inputRow, { marginBottom: keyboardHeight }]}>
-          <Image
-            source={{ uri: me?.avatar || "https://i.pravatar.cc/100" }}
-            style={styles.inputAvatar}
-          />
+          {me?.avatar ? (
+            <Image source={{ uri: me.avatar }} style={styles.inputAvatar} />
+          ) : (
+            <View style={[styles.inputAvatar, { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="person" size={20} color="#fff" />
+            </View>
+          )}
 
           <TextInput
             style={styles.input}

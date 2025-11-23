@@ -6,7 +6,7 @@ export const MOCK_USERS: User[] = [
     id: '1',
     name: 'John Doe',
     email: 'john@example.com',
-    avatar: 'https://i.pravatar.cc/150?img=1',
+    avatar: undefined,
     country: 'United States',
     city: 'New York',
     flag: '🇺🇸',
