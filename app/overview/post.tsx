@@ -9,12 +9,21 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import ApiService from '@/src/services/api';
 import communityService from '@/src/services/communityService';
 import type { LocalMediaFile, Community } from '@/src/types';
+import { postService } from '@/src/services/postService';
 
 const { width } = Dimensions.get('window');
 
 export default function PostScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ communityId?: string }>();
+  const params = useLocalSearchParams<{
+    communityId?: string;
+    edit?: string;
+    postId?: string;
+  }>();
+
+  const isEditMode = params.edit === "1";
+  const postId = params.postId;
+  const [isLoadedEditPost, setIsLoadedEditPost] = useState(false);
 
   const communityId = useMemo(() => (params?.communityId ? Number(params.communityId) : null), [params?.communityId]);
 
@@ -23,22 +32,53 @@ export default function PostScreen() {
   const [disableComments, setDisableComments] = useState(false);
   const [hideLikeCount, setHideLikeCount] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<LocalMediaFile[]>([]);
+  const [editCommunityId, setEditCommunityId] = useState<number | null>(null);
 
   const [meUsername, setMeUsername] = useState<string | null>(null);
-  const [community, setCommunity] = useState<Community | null>(null);
-  const [isMember, setIsMember] = useState(false);
-  const [checkingMembership, setCheckingMembership] = useState(true);
-
   useEffect(() => {
     (async () => {
       try {
         const me = await ApiService.getCurrentUser();
-        setMeUsername((me as any)?.username ?? null);
+        setMeUsername(me?.username ?? null);
       } catch (e) {
-        console.warn('getMe error', e);
+        console.warn("Failed to load current user:", e);
       }
     })();
   }, []);
+
+  const [community, setCommunity] = useState<Community | null>(null);
+  const [isMember, setIsMember] = useState(false);
+  const [checkingMembership, setCheckingMembership] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+  useEffect(() => {
+    if (!isEditMode || !postId || !meUsername) return;
+
+    (async () => {
+      try {
+        const post = await postService.getById(Number(postId), meUsername);
+
+        setCaption(post.content ?? "");
+
+        const converted = post.post_media.map(m => ({
+          id: m.id,
+          uri: m.media_url,
+          type: m.media_type === "video" ? "video/mp4" : "image/jpeg",
+          name: `old_${m.id}`,
+        }));
+
+        setSelectedMedia(converted as any);
+        setEditCommunityId(post.community_id ?? null);
+        setIsLoadedEditPost(true);
+      } catch (error) {
+        console.error("Load edit post failed:", error);
+        Alert.alert("Error", "Cannot load the post to edit.");
+        router.back();
+      }
+    })();
+  }, [isEditMode, postId, meUsername]);
+
 
   useEffect(() => {
     if (!communityId || !meUsername) return;
@@ -90,60 +130,95 @@ export default function PostScreen() {
   };
 
   const handleRemoveImage = (index: number) => {
-    setSelectedMedia((prev) => prev.filter((_, i) => i !== index));
+    setSelectedMedia(prev => prev.filter((_, i) => i !== index));
   };
 
   const onSubmit = async () => {
     try {
-      if (!communityId) {
-        Alert.alert('Thiếu thông tin', 'Không xác định được cộng đồng.');
-        return;
-      }
       if (!meUsername) {
-        Alert.alert('Thiếu thông tin', 'Không xác định được người đăng.');
+        Alert.alert("Error", "Cannot identify user.");
         return;
       }
+      if (isSubmitting) return; 
+      setIsSubmitting(true);
+
+      // =============== EDIT MODE ===============
+      if (isEditMode && postId) {
+        const oldMedia = selectedMedia.filter(m => m.id);
+        const newMedia = selectedMedia.filter(m => !m.id);
+
+        await postService.update(Number(postId), {
+          author_username: meUsername,
+          content: caption,
+          audience,
+          disable_comments: disableComments,
+          hide_like_count: hideLikeCount,
+          community_id: editCommunityId, 
+        });
+
+        const fullPost = await postService.getById(Number(postId), meUsername);
+        const originalMedia = fullPost.post_media.map(m => m.id);
+
+        for (const originalId of originalMedia) {
+          const stillExist = oldMedia.find(m => m.id === originalId);
+          if (!stillExist) {
+            await postService.removeMedia(Number(postId), originalId, meUsername);
+          }
+        }
+
+        if (newMedia.length > 0) {
+          await postService.uploadMedia(Number(postId), newMedia as any);
+        }
+
+        Alert.alert("Success", "The post has been updated.");
+
+        router.back();
+        return;
+      }
+
+      // =============== CREATE MODE ===============
+      if (!communityId) {
+        Alert.alert("Error", "Missing communityId.");
+        return;
+      }
+
       if (!caption && selectedMedia.length === 0) {
-        Alert.alert('Thiếu nội dung', 'Hãy viết điều gì đó hoặc chọn một ảnh.');
+        Alert.alert("Missing content", "Please write something or select a photo/video.");
         return;
       }
 
-      // BE /communities/:id/posts chỉ nhận 1 file "image"
-      const first = selectedMedia[0];
-
-      const res = await communityService.createCommunityPost(communityId, {
-        authorUsername: meUsername,
-        content: caption || undefined,
-        image: first ? ({
-          uri: first.uri,
-          name: first.name,
-          type: first.type,
-        } as any) : undefined,
+      const created = await postService.create({
+        author_username: meUsername,
+        content: caption,
         audience,
-        disableComments,
-        hideLikeCount,
+        disable_comments: disableComments,
+        hide_like_count: hideLikeCount,
+        community_id: Number(communityId),
       });
 
-      if (res.status === 'pending') {
-        Alert.alert('Pending Approval', 'Your post has been submitted and is pending approval from admins.');
-      } else {
-        Alert.alert('Success', 'Post created successfully.');
+      if (selectedMedia.length > 0) {
+        await postService.uploadMedia(created.id, selectedMedia as any);
       }
+
+      Alert.alert("Success", "The post has been shared successfully!");
       router.back();
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Failed to create post.');
+      
+    } catch (error) {
+      setIsSubmitting(false);
+      console.error(error);
+      Alert.alert("Error", "Unable to process the request.");
     }
   };
 
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.title}>Đăng bài vào {community?.name || 'Cộng đồng'}</Text>
+      <Text style={styles.title}>Post to {community?.name || 'Community'}</Text>
 
       {/* Caption */}
       <TextInput
         style={styles.captionInput}
-        placeholder="Viết gì đó..."
+        placeholder="Write something..."
         placeholderTextColor="#999"
         multiline
         value={caption}
@@ -166,28 +241,19 @@ export default function PostScreen() {
 
       <Pressable onPress={handlePickMedia} style={styles.addMediaBtn}>
         <AntDesign name="plus-circle" size={22} />
-        <Text style={styles.addMediaText}>Thêm ảnh / video</Text>
+        <Text style={styles.addMediaText}>Add photo / video</Text>
       </Pressable>
-
-      {/* Options */}
-      <View style={{ marginTop: 24 }}>
-        <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>Tắt bình luận</Text>
-          <Switch value={disableComments} onValueChange={setDisableComments} />
-        </View>
-        <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>Ẩn số lượt thích</Text>
-          <Switch value={hideLikeCount} onValueChange={setHideLikeCount} />
-        </View>
-      </View>
 
       <Button
         mode="contained"
         onPress={onSubmit}
+        disabled={isSubmitting}
         style={styles.submitBtn}
-        disabled={checkingMembership || !isMember}
       >
-        {checkingMembership ? 'Checking...' : 'Đăng bài'}
+        {isSubmitting
+          ? (isEditMode ? "Saving..." : "Posting...")
+          : (isEditMode ? "Save Changes" : "Share Post")
+        }
       </Button>
     </ScrollView>
   );
@@ -202,13 +268,13 @@ const styles = StyleSheet.create({
     padding: 12, fontSize: 15, color: '#111',
   },
   previewImage: {
-    width: width * 0.6, height: 280, borderRadius: 10, marginRight: 12, backgroundColor: '#eee',
+    width: width * 0.85, height: 280, borderRadius: 10, marginRight: 12, backgroundColor: '#eee',
   },
   imageWrap: { position: 'relative' },
-  removeBtn: { position: 'absolute', top: 8, right: 8 },
+  removeBtn: { position: 'absolute', top: 8, right: 23 },
   addMediaBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 8 },
   addMediaText: { fontSize: 15, fontWeight: '500' },
   optionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   optionLabel: { fontSize: 16, color: '#111' },
-  submitBtn: { marginTop: 24, borderRadius: 25, paddingVertical: 4 },
+  submitBtn: { marginTop: 24, borderRadius: 25, paddingVertical: 4, backgroundColor: '#038dffff' },
 });

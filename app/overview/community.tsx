@@ -19,6 +19,7 @@ import type { Community, User, UserLite } from '@/src/types';
 import PostItem from '@/components/posts/post_item';
 import CommentsSheet from '@/components/posts/comments_sheet';
 import { useTheme } from '@/src/context/ThemeContext';
+import { postService } from '@/src/services/postService';
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -48,7 +49,6 @@ export default function CommunityScreen() {
     return null;
   }, [me]);
 
-  // Load current user (để lấy avatar + username)
   useEffect(() => {
     (async () => {
       try {
@@ -60,7 +60,6 @@ export default function CommunityScreen() {
     })();
   }, []);
 
-  // Load community header
   useEffect(() => {
     if (!communityId) return;
     (async () => {
@@ -196,20 +195,45 @@ export default function CommunityScreen() {
     );
   }, [communityId, me?.username, community]);
 
-  const onLikeToggle = useCallback(async (post: CommunityPost, isCurrentlyLiked: boolean) => {
-    if (!me?.username) return;
-    try {
-      if (isCurrentlyLiked) {
-        await communityService.unlikePost(communityId, post.id, me.username);
-        setPosts((prev) => prev.map(p => p.id === post.id ? { ...p, like_count: Math.max(0, (p.like_count || 0) - 1) } : p));
-      } else {
-        await communityService.likePost(communityId, post.id, me.username);
-        setPosts((prev) => prev.map(p => p.id === post.id ? { ...p, like_count: (p.like_count || 0) + 1 } : p));
+  const onLikeToggle = useCallback(
+    async (post: CommunityPost, nextLiked: boolean) => {
+      if (!me?.username) return;
+
+      try {
+        if (nextLiked) {
+          const res = await postService.like(post.id);
+
+          setPosts(prev =>
+            prev.map(p =>
+              p.id === post.id
+                ? {
+                    ...p,
+                    like_count: res?.like_count ?? (p.like_count || 0) + 1,
+                  }
+                : p
+            )
+          );
+        } else {
+          const res = await postService.unlike(post.id);
+
+          setPosts(prev =>
+            prev.map(p =>
+              p.id === post.id
+                ? {
+                    ...p,
+                    like_count: res?.like_count ?? Math.max(0, (p.like_count || 0) - 1),
+                  }
+                : p
+            )
+          );
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  }, [communityId, me?.username]);
+    },
+    [me?.username]
+  );
+
 
   const renderHeader = useMemo(() => {
     if (!community) return null;
@@ -225,10 +249,6 @@ export default function CommunityScreen() {
               <Ionicons name="people" size={64} color="rgba(255,255,255,0.5)" />
             </View>
           )}
-          {/* Back Button Overlay */}
-          <Pressable style={styles.backButtonOverlay} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
         </View>
 
         {/* HEADER INFO */}
@@ -341,15 +361,49 @@ export default function CommunityScreen() {
     return (
       <PostItem
         post={item}
+        meUsername={me?.username ?? "user"}
+
+        onEditClick={(p) => {
+          router.push(`/overview/post?edit=1&postId=${p.id}`); 
+        }}
+
+        onDeleteClick={async (p) => {
+          Alert.alert(
+            "Delete Post",
+            "Are you sure you want to delete this post?",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    await postService.delete(p.id, me?.username!);
+
+                    setPosts((prev) => prev.filter((x) => x.id !== p.id));
+
+                    Alert.alert("Success", "Post deleted.");
+                  } catch (err) {
+                    console.error(err);
+                    Alert.alert("Error", "Failed to delete post.");
+                  }
+                }
+              }
+            ]
+          );
+        }}
+
         onCommentClick={(p) => {
           setSelectedPostId(p.id);
           setCommentsVisible(true);
         }}
+
         onLikeToggle={(p, liked) => onLikeToggle(p as any, liked)}
-        initialIsLiked={false}
+        initialIsLiked={item.isLikedByViewer ?? false}
       />
     );
-  }, [onLikeToggle]);
+  }, [onLikeToggle, me?.username]);
+
 
 
   if (loading && posts.length === 0) {

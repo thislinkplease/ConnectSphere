@@ -213,6 +213,7 @@ export interface CommentsSheetProps {
 }
 
 export interface LocalMediaFile {
+  id: number;
   uri: string;
   type: string;
   name: string;

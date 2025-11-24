@@ -15,10 +15,8 @@ export interface PostItemProps {
   onCommentClick?: (post: Post) => void;
   onLikeToggle?: (post: Post, nextLiked: boolean) => void;
   initialIsLiked?: boolean;
-  showFollowButton?: boolean;
-  isFollowingAuthor?: boolean;
-  onFollowClick?: (username: string) => void;
   showMoreMenu?: boolean;
+  meUsername?: string;
 }
 
 // Video component for single media
@@ -45,14 +43,13 @@ export default function PostItem({
   onCommentClick,
   onLikeToggle,
   initialIsLiked,
-  showFollowButton = false,
-  isFollowingAuthor = false,
-  onFollowClick = () => { },
   showMoreMenu = true,
+  meUsername
 }: PostItemProps) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState<boolean>(!!initialIsLiked);
   const [likeCount, setLikeCount] = useState<number>(post?.like_count ?? 0);
+  const isOwner = meUsername === post.author_username;
 
   useEffect(() => setIsLiked(!!initialIsLiked), [initialIsLiked, post?.id]);
   useEffect(() => setLikeCount(post?.like_count ?? 0), [post?.like_count, post?.id]);
@@ -106,10 +103,11 @@ export default function PostItem({
         </Pressable>
 
         {showMoreMenu && (
-          <Pressable hitSlop={8} onPress={() => actionSheet(post, onEditClick, onDeleteClick)}>
+          <Pressable hitSlop={8} onPress={() => openActionMenu(post, isOwner, onEditClick, onDeleteClick)}>
             <Feather name="more-vertical" size={22} color="#111" />
           </Pressable>
         )}
+
       </View>
 
       {/* Media */}
@@ -179,34 +177,44 @@ export default function PostItem({
   );
 }
 
-function actionSheet(
-  post: Post,
-  onEditClick?: (post: Post) => void,
-  onDeleteClick?: (post: Post) => void
-) {
-  Alert.alert(
-    'Post Options',
-    'Choose an action',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Edit',
-        onPress: () => onEditClick?.(post)
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => onDeleteClick?.(post)
-      },
-    ]
-  );
+function openActionMenu(post: Post, isOwner: boolean, onEditClick?: (post: Post) => void, onDeleteClick?: (post: Post) => void) {
+  if (isOwner) {
+    Alert.alert(
+      "Post Options",
+      "Choose an action",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Edit", onPress: () => onEditClick?.(post) },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => onDeleteClick?.(post)
+        },
+      ]
+    );
+  } else {
+    Alert.alert(
+      "Report Post",
+      "Do you want to report this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Report",
+          onPress: () => {
+            Alert.alert("Reported", "We have received your report.");
+          }
+        }
+      ]
+    );
+  }
 }
+
 
 const styles = StyleSheet.create({
   card: {
     width: '100%',
     backgroundColor: '#fff',
-    marginBottom: 10, // Spacing between cards
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -259,7 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f2f5',
   },
   multiMedia: {
-    width: SCREEN_WIDTH * 0.8,
+    width: SCREEN_WIDTH * 0.9,
     height: 350,
     borderRadius: 8,
     marginRight: 8,
@@ -290,6 +298,6 @@ const styles = StyleSheet.create({
   },
 
   divider: {
-    height: 0, // Removed divider, using marginBottom on card instead
+    height: 1, 
   },
 });

@@ -10,13 +10,14 @@ export type CommunityPost = Post & {
   community_name?: string;
   author_avatar?: string | null;
   author_display_name?: string | null;
-  post_media: PostMedia[]; // luôn là array (BE luôn trả [])
+  post_media: PostMedia[];
+  isLikedByViewer?: boolean;
 };
 
 export interface CommunityPostsParams {
   limit?: number;
-  before?: string; // ISO string cursor (created_at của bài cuối)
-  viewer?: string; // username of viewer for private community access check
+  before?: string;
+  viewer?: string;
 }
 
 const communityService = {
@@ -259,7 +260,15 @@ const communityService = {
     content: string,
     parentId?: number | null
   ): Promise<any> {
-    return ApiService.addPostComment(String(communityId), String(postId), authorUsername, content, parentId ? String(parentId) : undefined);
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/posts/${postId}/comments`,
+      {
+        author_username: authorUsername,
+        content,
+        parent_id: parentId ?? null,
+      }
+    );
+    return res.data;
   },
 
   async getPostComments(
@@ -290,10 +299,13 @@ const communityService = {
     communityId: number | string,
     postId: number | string,
     commentId: number | string,
-    actor?: string // Deprecated
+    actor: string
   ): Promise<void> {
     await ApiService.client.delete(
-      `/communities/${communityId}/posts/${postId}/comments/${commentId}`
+      `/communities/${communityId}/posts/${postId}/comments/${commentId}`,
+      {
+        data: { actor },
+      }
     );
   },
 
@@ -302,11 +314,11 @@ const communityService = {
     postId: number | string,
     commentId: number | string,
     content: string,
-    actor?: string // Deprecated
+    actor: string
   ): Promise<any> {
     const res = await ApiService.client.patch(
       `/communities/${communityId}/posts/${postId}/comments/${commentId}`,
-      { content }
+      { actor, content }
     );
     return res.data;
   },

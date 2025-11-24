@@ -51,7 +51,9 @@ export default function RootLayout() {
                         name="overview/community"
                         options={{
                            presentation: "card",
-                           headerShown: false,
+                           headerShown: true,
+                           title: 'Community',
+                           headerBackTitle: "Back"
                         }}
                      />
                      <Stack.Screen
