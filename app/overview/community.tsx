@@ -29,6 +29,8 @@ export default function CommunityScreen() {
 
   const [me, setMe] = useState<User | null>(null);
   const [community, setCommunity] = useState<(Community & { is_member?: boolean }) | null>(null);
+  const cover = community?.cover_image || community?.image_url;
+  const [myRole, setMyRole] = useState<'admin' | 'moderator' | 'member' | null>(null);
 
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,12 @@ export default function CommunityScreen() {
       try {
         setLoading(true);
         const viewer = me?.username;
+
+        if (me?.username) {
+          const role = await communityService.getMemberRole(communityId, me.username);
+          setMyRole(role);
+        }
+
         const c = await communityService.getCommunity(communityId, viewer);
         setCommunity(c);
 
@@ -234,7 +242,6 @@ export default function CommunityScreen() {
     [me?.username]
   );
 
-
   const renderHeader = useMemo(() => {
     if (!community) return null;
 
@@ -242,8 +249,8 @@ export default function CommunityScreen() {
       <View style={{ backgroundColor: colors.card }}>
         {/* TOP BANNER - Full Width 16:9 */}
         <View style={styles.bannerContainer}>
-          {community.image_url ? (
-            <Image source={{ uri: community.image_url }} style={styles.banner} resizeMode="cover" />
+          {cover ? (
+            <Image source={{ uri: cover }} style={styles.banner} />
           ) : (
             <View style={[styles.banner, { backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
               <Ionicons name="people" size={64} color="rgba(255,255,255,0.5)" />
@@ -270,10 +277,6 @@ export default function CommunityScreen() {
                   <Text style={[styles.btnText, { color: colors.text }]}>Joined</Text>
                   <Ionicons name="chevron-down" size={16} color={colors.text} />
                 </Pressable>
-                <Pressable style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => router.push(`/overview/post?communityId=${communityId}`)}>
-                  <Ionicons name="add" size={20} color="#fff" />
-                  <Text style={[styles.btnText, { color: '#fff' }]}>Invite</Text>
-                </Pressable>
               </>
             ) : (
               <Pressable style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 1 }]} onPress={onJoinPress}>
@@ -282,17 +285,18 @@ export default function CommunityScreen() {
             )}
 
             {/* Manage / Settings */}
-            {me?.username === community.created_by && (
-              <Pressable
-                style={[styles.iconBtn, { backgroundColor: colors.surface }]}
-                onPress={() => router.push({
-                  pathname: '/overview/community-settings',
-                  params: { id: String(communityId) },
-                })}
-              >
-                <Ionicons name="shield-checkmark" size={20} color={colors.text} />
-              </Pressable>
-            )}
+            {myRole === 'admin' || myRole === 'moderator' || me?.username === community.created_by ? (
+                <Pressable
+                  style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+                  onPress={() => router.push({
+                    pathname: '/overview/community-settings',
+                    params: { id: String(communityId) },
+                  })}
+                >
+                  <Ionicons name="shield-checkmark" size={20} color={colors.text} />
+                </Pressable>
+            ) : null}
+                   
 
             {/* Chat Button */}
             {community.is_member && (
@@ -311,7 +315,7 @@ export default function CommunityScreen() {
 
         {/* TABS */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsContainer, { borderBottomColor: colors.border }]}>
-          {['Discussion', 'Featured', 'People', 'Events', 'Media', 'Files'].map((tab) => (
+          {['Discussion', 'People', 'Events', 'Details'].map((tab) => (
             <Pressable key={tab} style={[styles.tabItem, tab === 'Discussion' && styles.activeTabItem]}>
               <Text style={[styles.tabText, { color: tab === 'Discussion' ? colors.primary : colors.textSecondary }]}>{tab}</Text>
               {tab === 'Discussion' && <View style={[styles.activeIndicator, { backgroundColor: colors.primary }]} />}
@@ -469,7 +473,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8,
     gap: 6,
   },
-  joinedBtn: { borderWidth: 1, backgroundColor: 'transparent' },
+  joinedBtn: { 
+    borderWidth: 1, 
+    backgroundColor: 'transparent',
+    flex: 1
+  },
   btnText: { fontSize: 15, fontWeight: '600' },
   iconBtn: {
     width: 40, height: 40, borderRadius: 8,
@@ -482,6 +490,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   tabItem: {
+    paddingHorizontal: 8,
     paddingVertical: 12,
     marginRight: 24,
     position: 'relative',

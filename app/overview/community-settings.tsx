@@ -11,15 +11,17 @@ import {
   Switch,
   TextInput,
   FlatList,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { Button } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useAuth } from '@/src/context/AuthContext';
-import communityService from '@/src/services/communityService';
-import type { Community, CommunityJoinRequest } from '@/src/types';
+import communityService, { CommunityPost } from '@/src/services/communityService';
+import type { Community, CommunityJoinRequest, Post } from '@/src/types';
 
 type TabType = 'settings' | 'members' | 'posts' | 'requests';
 
@@ -45,13 +47,18 @@ export default function CommunitySettingsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [community, setCommunity] = useState<Community | null>(null);
   const [members, setMembers] = useState<MemberWithUser[]>([]);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [approvedPosts, setApprovedPosts] = useState<Post[]>([]);
+  const [pendingPosts, setPendingPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+
   const [joinRequests, setJoinRequests] = useState<CommunityJoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const canModerate = isAdmin || isModerator;
 
-  // Form states
   const [name, setName] = useState('');
+  const cover = community?.cover_image || community?.image_url;
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [requiresPostApproval, setRequiresPostApproval] = useState(false);
@@ -68,10 +75,11 @@ export default function CommunitySettingsScreen() {
       setRequiresPostApproval(data.requires_post_approval || false);
       setRequiresMemberApproval(data.requires_member_approval || false);
 
-      // Check if current user is admin
+      // Check if current user is admin or moderator
       if (user?.username) {
         const role = await communityService.getMemberRole(communityId, user.username);
-        setIsAdmin(role === 'admin' || role === 'moderator');
+        setIsAdmin(role === 'admin');
+        setIsModerator(role === 'moderator');
       }
     } catch (error) {
       console.error('Error loading community:', error);
@@ -84,26 +92,52 @@ export default function CommunitySettingsScreen() {
   const loadMembers = useCallback(async () => {
     try {
       const data = await communityService.getCommunityMembers(communityId);
-      setMembers(data);
+
+      const order: Record<'admin' | 'moderator' | 'member', number> = {
+        admin: 1,
+        moderator: 2,
+        member: 3,
+      };
+      const sorted = [...data].sort((a, b) => {
+        return order[a.role as keyof typeof order] - order[b.role as keyof typeof order];
+      });
+
+      setMembers(sorted);
     } catch (error) {
       console.error('Error loading members:', error);
     }
   }, [communityId]);
 
+  useEffect(() => {
+    if (!isAdmin || !community?.created_by) {
+      setActiveTab('members');
+    }
+  }, [isAdmin, community?.created_by]);
+
   const loadPosts = useCallback(async () => {
     try {
-      const data = await communityService.getCommunityPosts(communityId, {
+      setLoadingPosts(true);
+
+      const approved = await communityService.getCommunityPosts(communityId, {
         limit: 50,
         viewer: user?.username
       });
-      setPosts(data);
+      setApprovedPosts(approved);
+
+      const pendings = await communityService.getPendingPosts(communityId);
+      setPendingPosts(pendings);
+
     } catch (error) {
       console.error('Error loading posts:', error);
+      setApprovedPosts([]);
+      setPendingPosts([]);
+    } finally {
+      setLoadingPosts(false);
     }
   }, [communityId, user?.username]);
 
   const loadJoinRequests = useCallback(async () => {
-    if (!user?.username || !isAdmin) return;
+    if (!user?.username || !canModerate) return;
     try {
       const data = await communityService.getJoinRequests(communityId, user.username);
       setJoinRequests(data);
@@ -182,38 +216,6 @@ export default function CommunitySettingsScreen() {
     }
   };
 
-  const handleChangeAvatar = async () => {
-    if (!user?.username || !isAdmin) return;
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        const image = {
-          uri: asset.uri,
-          type: asset.mimeType || 'image/jpeg',
-          name: asset.fileName || `avatar_${Date.now()}.jpg`,
-        };
-
-        setSaving(true);
-        await communityService.uploadCommunityAvatar(communityId, user.username, image as any);
-        Alert.alert('Success', 'Community avatar updated');
-        loadCommunity();
-        setSaving(false);
-      }
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      Alert.alert('Error', 'Failed to upload avatar');
-      setSaving(false);
-    }
-  };
-
   const handleChangeMemberRole = async (member: MemberWithUser, newRole: 'admin' | 'moderator' | 'member') => {
     if (!user?.username || !isAdmin) return;
 
@@ -253,9 +255,7 @@ export default function CommunitySettingsScreen() {
     );
   };
 
-  const handleDeletePost = async (post: any) => {
-    if (!user?.username || !isAdmin) return;
-
+  const handleDeletePost = async (postId: number) => {
     Alert.alert(
       'Delete Post',
       'Are you sure you want to delete this post? This action cannot be undone.',
@@ -266,7 +266,7 @@ export default function CommunitySettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await communityService.deleteCommunityPost(communityId, post.id, user.username);
+              await communityService.deleteCommunityPost(communityId, postId);
               Alert.alert('Success', 'Post deleted successfully');
               loadPosts();
             } catch (error) {
@@ -280,10 +280,10 @@ export default function CommunitySettingsScreen() {
   };
 
   const handleReviewRequest = async (request: CommunityJoinRequest, action: 'approve' | 'reject') => {
-    if (!user?.username || !isAdmin) return;
+    if (!user?.username || !canModerate) return;
 
     try {
-      await communityService.reviewJoinRequest(communityId, request.id, action, user.username);
+      await communityService.reviewJoinRequest(communityId, request.username, action);
       Alert.alert('Success', `Request ${action === 'approve' ? 'approved' : 'rejected'}`);
       loadJoinRequests();
       if (action === 'approve') {
@@ -292,6 +292,26 @@ export default function CommunitySettingsScreen() {
     } catch (error) {
       console.error('Error reviewing request:', error);
       Alert.alert('Error', 'Failed to review request');
+    }
+  };
+
+  const handleApprovePost = async (postId: number) => {
+    try {
+      await communityService.approvePost(community!.id, postId);
+      setPendingPosts(prev => prev.filter(p => p.id !== postId));
+      const latestApproved = await communityService.getCommunityPosts(community!.id, { limit: 50, viewer: user?.username });
+      setApprovedPosts(latestApproved);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to approve post');
+    }
+  };
+
+  const handleRejectPost = async (postId: number) => {
+    try {
+      await communityService.rejectPost(community!.id, postId);
+      setPendingPosts(prev => prev.filter(p => p.id !== postId));
+    } catch (e) {
+      Alert.alert('Error', 'Failed to reject post');
     }
   };
 
@@ -336,65 +356,21 @@ export default function CommunitySettingsScreen() {
     </View>
   );
 
-  const renderPost = ({ item }: { item: any }) => (
-    <View style={[styles.postItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.postHeader}>
-        <View style={styles.postAuthor}>
-          <Text style={[styles.postAuthorName, { color: colors.text }]}>
-            {item.authorDisplayName || item.author_username}
-          </Text>
-          <Text style={[styles.postDate, { color: colors.textMuted }]}>
-            {new Date(item.created_at).toLocaleDateString()}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={() => handleDeletePost(item)}>
-          <Ionicons name="trash-outline" size={20} color={colors.error || '#EF4444'} />
-        </TouchableOpacity>
-      </View>
-      {item.content && (
-        <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
-          {item.content}
-        </Text>
-      )}
-      {item.post_media && item.post_media.length > 0 && (
-        <Image
-          source={{ uri: item.post_media[0].media_url }}
-          style={styles.postImage}
-          resizeMode="cover"
-        />
-      )}
-      <View style={styles.postStats}>
-        <View style={styles.statItem}>
-          <Ionicons name="heart" size={16} color={colors.textMuted} />
-          <Text style={[styles.statText, { color: colors.textMuted }]}>
-            {item.like_count || 0}
-          </Text>
-        </View>
-        <View style={styles.statItem}>
-          <Ionicons name="chatbubble" size={16} color={colors.textMuted} />
-          <Text style={[styles.statText, { color: colors.textMuted }]}>
-            {item.comment_count || 0}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-
   const renderJoinRequest = ({ item }: { item: CommunityJoinRequest }) => (
     <View style={[styles.requestItem, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
       <View style={styles.memberInfo}>
-        {item.users?.avatar ? (
-          <Image source={{ uri: item.users.avatar }} style={styles.memberAvatar} />
+        {item.user?.avatar ? (
+          <Image source={{ uri: item.user.avatar }} style={styles.memberAvatar} />
         ) : (
           <View style={[styles.memberAvatar, styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
             <Ionicons name="person" size={24} color={colors.textMuted} />
           </View>
         )}
         <View style={styles.memberDetails}>
-          <Text style={[styles.memberName, { color: colors.text }]}>{item.users?.name || item.username}</Text>
-          {item.users?.bio && (
+          <Text style={[styles.memberName, { color: colors.text }]}>{item.user?.name || item.username}</Text>
+          {item.user?.bio && (
             <Text style={[styles.memberBio, { color: colors.textSecondary }]} numberOfLines={2}>
-              {item.users.bio}
+              {item.user.bio}
             </Text>
           )}
         </View>
@@ -426,26 +402,6 @@ export default function CommunitySettingsScreen() {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="lock-closed" size={64} color={colors.disabled} />
-          <Text style={[styles.errorText, { color: colors.textMuted }]}>
-            Only admins can access community settings
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -462,14 +418,6 @@ export default function CommunitySettingsScreen() {
         style={[styles.tabs, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
       >
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'settings' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
-          onPress={() => setActiveTab('settings')}
-        >
-          <Text style={[styles.tabText, activeTab === 'settings' && [styles.activeTabText, { color: colors.primary }]]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={[styles.tab, activeTab === 'members' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
           onPress={() => setActiveTab('members')}
         >
@@ -485,13 +433,23 @@ export default function CommunitySettingsScreen() {
             Posts
           </Text>
         </TouchableOpacity>
-        {isPrivate && (
+        {(isPrivate || requiresMemberApproval) && (
           <TouchableOpacity
             style={[styles.tab, activeTab === 'requests' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
             onPress={() => setActiveTab('requests')}
           >
             <Text style={[styles.tabText, activeTab === 'requests' && [styles.activeTabText, { color: colors.primary }]]}>
               Requests {joinRequests.length > 0 && `(${joinRequests.length})`}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {isAdmin && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'settings' && [styles.activeTab, { borderBottomColor: colors.primary }]]}
+            onPress={() => setActiveTab('settings')}
+          >
+            <Text style={[styles.tabText, activeTab === 'settings' && [styles.activeTabText, { color: colors.primary }]]}>
+              Settings
             </Text>
           </TouchableOpacity>
         )}
@@ -507,8 +465,8 @@ export default function CommunitySettingsScreen() {
               style={[styles.coverImageContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={handleChangeCover}
             >
-              {community?.image_url ? (
-                <Image source={{ uri: community.image_url }} style={styles.coverImage} />
+              {cover ? (
+                <Image source={{ uri: cover }} style={styles.coverImage}/>
               ) : (
                 <View style={styles.coverImagePlaceholder}>
                   <Ionicons name="image-outline" size={48} color={colors.textMuted} />
@@ -631,18 +589,119 @@ export default function CommunitySettingsScreen() {
       )}
 
       {activeTab === 'posts' && (
-        <FlatList
-          data={posts}
-          renderItem={renderPost}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="document-text-outline" size={64} color={colors.disabled} />
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No posts yet</Text>
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          {loadingPosts && <Text>Loading posts…</Text>}
+
+          {/* --- PENDING --- */}
+          {(isAdmin || isModerator) && (
+            <>
+              <Text style={styles.sectionTitle}>Pending ({pendingPosts.length})</Text>
+              {pendingPosts.map((p) => (
+                <View key={p.id} style={styles.postCard}>
+                  {/* Header + content */}
+                  <View style={styles.postHeader}>
+                    <Text style={styles.postAuthorName}>{p.authorDisplayName || p.author_username}</Text>
+                    <Text style={styles.postDate}>{new Date(p.created_at).toLocaleString()}</Text>
+                  </View>
+                  {!!p.content && <Text style={styles.postContent}>{p.content}</Text>}
+                  {p.post_media?.[0]?.media_url ? (
+                    <Image source={{ uri: p.post_media[0].media_url }} style={styles.postImage} />
+                  ) : null}
+
+                  {/* Button Approve / Reject */}
+                  <View style={styles.rowActions}>
+                    <Button
+                      mode="contained"
+                      onPress={() => handleApprovePost(p.id)}
+                      style={[styles.actionBtn, styles.approveBtn]}
+                    >
+                      Approve
+                    </Button>
+
+                    <Button
+                      mode="outlined"
+                      onPress={() => handleRejectPost(p.id)}
+                      style={[styles.actionBtn, styles.rejectBtn]}
+                      textColor="#ef4444"
+                    >
+                      Reject
+                    </Button>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
+          <View style={styles.divider} />
+
+          {/* --- APPROVED --- */}
+          <Text style={styles.sectionTitle}>Approved ({approvedPosts.length})</Text>
+          {approvedPosts.map((p) => (
+            <View key={p.id} style={styles.postCard}>
+
+              {/* DELETE */}
+              <TouchableOpacity
+                onPress={() => handleDeletePost(p.id)}
+                style={styles.trashIcon}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color={colors.error || '#EF4444'}
+                />
+              </TouchableOpacity>
+
+              {/* HEADER */}
+              <View style={styles.postHeader}>
+                <View style={styles.postAuthor}>
+                  <Text style={[styles.postAuthorName, { color: colors.text }]}>
+                    {p.authorDisplayName || p.author_username}
+                  </Text>
+                  <Text style={[styles.postDate, { color: colors.textMuted }]}>
+                    {new Date(p.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* CONTENT */}
+              {!!p.content && (
+                <Text style={[styles.postContent, { color: colors.text }]} numberOfLines={3}>
+                  {p.content}
+                </Text>
+              )}
+
+              {/* MEDIA */}
+              {p.post_media?.length > 0 && (
+                <Image
+                  source={{ uri: p.post_media[0].media_url }}
+                  style={styles.postImage}
+                  resizeMode="cover"
+                />
+              )}
+
+              {/* STATS (Like / Comment) */}
+              <View style={styles.postStats}>
+                <View style={styles.statItem}>
+                  <Ionicons name="heart" size={16} color={colors.textMuted} />
+                  <Text style={[styles.statText, { color: colors.textMuted }]}>
+                    {p.like_count || 0}
+                  </Text>
+                </View>
+
+                <View style={styles.statItem}>
+                  <Ionicons name="chatbubble" size={16} color={colors.textMuted} />
+                  <Text style={[styles.statText, { color: colors.textMuted }]}>
+                    {p.comment_count || 0}
+                  </Text>
+                </View>
+              </View>
             </View>
-          }
-        />
+          ))}
+
+          {(!loadingPosts && approvedPosts.length === 0 && (!isAdmin || pendingPosts.length === 0)) && (
+            <Text>No posts yet.</Text>
+          )}
+        </ScrollView>
       )}
 
       {activeTab === 'requests' && (
@@ -716,7 +775,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 16,
@@ -933,5 +992,45 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 13,
+  },
+  postActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+  },
+  trashIcon: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  postCard: { 
+    position:'relative', 
+    borderWidth:1, 
+    borderColor:'#E5E7EB', 
+    borderRadius:12, 
+    padding:12, 
+    marginBottom:12, 
+    backgroundColor:'#fff' 
+  },
+  rowActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    borderRadius: 12,
+  },
+  approveBtn: {
+    marginLeft: 6,
+    backgroundColor: '#1c79f3ff',
+  },
+  rejectBtn: {
+    marginRight: 6,
+    borderColor: '#ef4444',
+  },
+  divider: {
+    height: 1, 
   },
 });

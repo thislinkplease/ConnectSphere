@@ -15,7 +15,7 @@ export default function DiscussionScreen() {
   const router = useRouter();
   const { colors, isPro } = useTheme();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('my-communities');
+  const [activeTab, setActiveTab] = useState<TabType>('discover');
   const [myCommunities, setMyCommunities] = useState<Community[]>([]);
   const [discoverCommunities, setDiscoverCommunities] = useState<Community[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,94 +76,99 @@ export default function DiscussionScreen() {
     setRefreshing(false);
   }, [loadCommunities]);
 
-  const handleCreateCommunity = useCallback(() => {
-    if (!isPro) {
-      Alert.alert(
-        'PRO Feature',
-        'Creating communities is a PRO feature. Upgrade to PRO to create your own community!',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Upgrade to PRO',
-            onPress: () => router.push('/account/payment-pro'),
-          },
-        ]
-      );
-      return;
-    }
-    
-    // Navigate to create community screen
-    router.push('/overview/create-community');
-  }, [isPro, router]);
+  const renderCommunityCard = ({ item }: { item: Community }) => {
+    const cover = item.cover_image || item.image_url;
 
-  const renderCommunityCard = ({ item }: { item: Community }) => (
-    <TouchableOpacity 
-      style={[styles.communityCard, { 
-        backgroundColor: colors.card,
-        shadowColor: colors.shadow,
-        borderColor: colors.border,
-      }]}
-      onPress={() => 
-        router.push({
-          pathname: '/overview/community',
-          params: { id: String(item.id) },
-        })
-      }
-    >
-      {item.image_url && (
-        <Image source={{ uri: item.image_url }} style={styles.communityImage} />
-      )}
-      <View style={styles.communityContent}>
-        <Text style={[styles.communityName, { color: colors.text }]}>{item.name}</Text>
-        {item.description && (
-          <Text style={[styles.communityDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-            {item.description}
-          </Text>
+    return (
+      <TouchableOpacity
+        style={[
+          styles.communityCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+        onPress={() =>
+          router.push({
+            pathname: "/overview/community",
+            params: { id: String(item.id) },
+          })
+        }
+      >
+        {cover && (
+          <Image source={{ uri: cover }} style={styles.communityImage} />
         )}
-        <View style={styles.communityFooter}>
-          <View style={styles.memberCount}>
-            <Ionicons name="people-outline" size={16} color={colors.textMuted} />
-            <Text style={[styles.memberCountText, { color: colors.textSecondary }]}>
-              {item.member_count} members
+
+        <View style={styles.communityContent}>
+          <Text style={[styles.communityName, { color: colors.text }]}>
+            {item.name}
+          </Text>
+
+          {item.description && (
+            <Text
+              style={[
+                styles.communityDescription,
+                { color: colors.textSecondary },
+              ]}
+              numberOfLines={2}
+            >
+              {item.description}
             </Text>
-          </View>
+          )}
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const currentCommunities = activeTab === 'my-communities' ? myCommunities : discoverCommunities;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Communities</Text>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          },
+        ]}
+      >
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Communities
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => {
+            if (!isPro) {
+              Alert.alert(
+                "PRO Feature",
+                "Creating communities is a PRO feature. Upgrade to PRO to create your own community!",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Upgrade to PRO",
+                    onPress: () => router.push("/account/payment-pro"),
+                  },
+                ]
+              );
+              return;
+            }
+
+            router.push("/overview/create-community");
+          }}
+          style={{ padding: 6 }}
+        >
+          <Ionicons
+            name="add-circle-outline"
+            size={26}
+            color={isPro ? colors.primary : colors.textMuted}
+          />
+        </TouchableOpacity>
       </View>
+
 
       {/* Tabs */}
       <View style={[styles.tabsContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'my-communities' && styles.activeTab,
-            activeTab === 'my-communities' && { borderBottomColor: colors.primary },
-          ]}
-          onPress={() => setActiveTab('my-communities')}
-        >
-          <Ionicons 
-            name="people" 
-            size={20} 
-            color={activeTab === 'my-communities' ? colors.primary : colors.textMuted} 
-          />
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'my-communities' ? colors.primary : colors.textMuted },
-            ]}
-          >
-            My Communities
-          </Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.tab,
@@ -186,6 +191,30 @@ export default function DiscussionScreen() {
             Discover
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'my-communities' && styles.activeTab,
+            activeTab === 'my-communities' && { borderBottomColor: colors.primary },
+          ]}
+          onPress={() => setActiveTab('my-communities')}
+        >
+          <Ionicons 
+            name="people" 
+            size={20} 
+            color={activeTab === 'my-communities' ? colors.primary : colors.textMuted} 
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === 'my-communities' ? colors.primary : colors.textMuted },
+            ]}
+          >
+            My Communities
+          </Text>
+        </TouchableOpacity>
+
       </View>
 
       {/* Search bar - only show in Discover tab */}
@@ -204,25 +233,24 @@ export default function DiscussionScreen() {
         
       )}
       
-      {/* Create Community Button - chỉ hiển thị khi đang ở tab Discover */}
-{activeTab === 'discover' && (
-  <TouchableOpacity
-    style={[
-      styles.createButton,
-      {
-        backgroundColor: isPro ? colors.primary : colors.border,
-        borderColor: isPro ? colors.primary : colors.border,
-      },
-    ]}
-    onPress={handleCreateCommunity}
-  >
-    <Ionicons name="add-circle-outline" size={20} color={isPro ? '#fff' : colors.textMuted} />
-    <Text style={[styles.createButtonText, { color: isPro ? '#fff' : colors.textMuted }]}>
-      {isPro ? 'Create Community' : 'Create Community (PRO)'}
-    </Text>
-  </TouchableOpacity>
-)}
-
+      {/* Create Community Button - chỉ hiển thị khi đang ở tab Discover
+      {activeTab === 'discover' && (
+        <TouchableOpacity
+          style={[
+            styles.createButton,
+            {
+              backgroundColor: isPro ? colors.primary : colors.border,
+              borderColor: isPro ? colors.primary : colors.border,
+            },
+          ]}
+          onPress={handleCreateCommunity}
+        >
+          <Ionicons name="add-circle-outline" size={20} color={isPro ? '#fff' : colors.textMuted} />
+          <Text style={[styles.createButtonText, { color: isPro ? '#fff' : colors.textMuted }]}>
+            {isPro ? 'Create Community' : 'Create Community (PRO)'}
+          </Text>
+        </TouchableOpacity>
+      )} */}
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
@@ -333,7 +361,7 @@ const styles = StyleSheet.create({
   },
   communityCard: {
     borderRadius: 12,
-    marginBottom: 12,
+    marginTop: 12,
     overflow: 'hidden',
     elevation: 2,
     shadowOffset: { width: 0, height: 2 },

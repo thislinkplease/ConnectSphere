@@ -17,6 +17,7 @@ class PostService {
     disable_comments?: boolean;
     hide_like_count?: boolean;
     community_id?: number | null;
+    status?: string | null;
   }) {
     const res = await ApiService.client.post("/posts", data);
     return res.data;
@@ -32,6 +33,7 @@ class PostService {
       disable_comments?: boolean;
       hide_like_count?: boolean;
       community_id?: number | null;
+      status?: string | null
     }
   ) {
     const res = await ApiService.client.put(`/posts/${postId}`, data);

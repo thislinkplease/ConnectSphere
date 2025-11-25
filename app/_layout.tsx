@@ -87,6 +87,7 @@ export default function RootLayout() {
                         name="account/profile"
                         options={{
                            presentation: "card",
+                           headerBackTitle: "Back"
                         }}
                      />
                      <Stack.Screen

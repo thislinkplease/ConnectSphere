@@ -5,7 +5,7 @@ export interface User {
    name: string;
    email: string;
    avatar?: string;
-   backgroundImage?: string; // Background image for Tinder-like hangout cards
+   backgroundImage?: string;
    country: string;
    city: string;
    flag?: string;
@@ -158,7 +158,7 @@ export interface CommunityJoinRequest {
   reviewed_at?: string | null;
   created_at: string;
   updated_at: string;
-  users?: User;
+  user?: User;
 }
 
 export interface PostMedia {

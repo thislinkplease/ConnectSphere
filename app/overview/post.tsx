@@ -48,6 +48,7 @@ export default function PostScreen() {
 
   const [community, setCommunity] = useState<Community | null>(null);
   const [isMember, setIsMember] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [checkingMembership, setCheckingMembership] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -87,10 +88,15 @@ export default function PostScreen() {
         setCheckingMembership(true);
         const c = await communityService.getCommunity(communityId, meUsername);
         setCommunity(c as any);
-        // Check if user is a member
         setIsMember(c.is_member || false);
 
-        // If not a member, show alert and go back
+        try {
+          const role = await communityService.getMemberRole(communityId, meUsername);
+          setIsAdmin(role === "admin" || role === "moderator");
+        } catch (e) {
+          console.warn("Failed to load member role:", e);
+        }
+
         if (!c.is_member) {
           Alert.alert(
             'Not a Member',
@@ -142,6 +148,8 @@ export default function PostScreen() {
       if (isSubmitting) return; 
       setIsSubmitting(true);
 
+      const status = community?.requires_post_approval ? "pending" : "approved";
+
       // =============== EDIT MODE ===============
       if (isEditMode && postId) {
         const oldMedia = selectedMedia.filter(m => m.id);
@@ -154,6 +162,7 @@ export default function PostScreen() {
           disable_comments: disableComments,
           hide_like_count: hideLikeCount,
           community_id: editCommunityId, 
+          status: status,
         });
 
         const fullPost = await postService.getById(Number(postId), meUsername);
@@ -194,13 +203,19 @@ export default function PostScreen() {
         disable_comments: disableComments,
         hide_like_count: hideLikeCount,
         community_id: Number(communityId),
+        status: status,
       });
 
       if (selectedMedia.length > 0) {
         await postService.uploadMedia(created.id, selectedMedia as any);
       }
 
-      Alert.alert("Success", "The post has been shared successfully!");
+      if (community?.requires_post_approval && !isAdmin) {
+        Alert.alert("Pending Approval", "Your post is awaiting admin review.");
+      } else {
+        Alert.alert("Success", "Your post has been shared successfully!");
+      }
+
       router.back();
       
     } catch (error) {
