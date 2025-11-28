@@ -27,7 +27,7 @@ export default function ConnectionScreen() {
    const { colors } = useTheme();
    const [users, setUsers] = useState<User[]>([]);
    const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
-   const [searchQuery, setSearchQuery] = useState("");
+   const [searchUser, setsearchUser] = useState("");
    const [viewMode, setViewMode] = useState<"users" | "events">("users");
    const [loading, setLoading] = useState(true);
    const [refreshing, setRefreshing] = useState(false);
@@ -41,6 +41,7 @@ export default function ConnectionScreen() {
    const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
 
    const [events, setEvents] = useState<any[]>([]);
+   const [searchEvent, setSearchEvent] = useState("");
 
    const loadEvents = async () => {
       try {
@@ -91,8 +92,8 @@ export default function ConnectionScreen() {
    const loadUsers = useCallback(async () => {
       try {
          setLoading(true);
-         if (searchQuery.trim()) {
-            const data = await ApiService.searchUsers(searchQuery);
+         if (searchUser.trim()) {
+            const data = await ApiService.searchUsers(searchUser);
             setUsers(data);
          } else {
             const data = await ApiService.getUsers();
@@ -103,7 +104,25 @@ export default function ConnectionScreen() {
       } finally {
          setLoading(false);
       }
-   }, [searchQuery]);
+   }, [searchUser]);
+
+   const searchEvents = useCallback(async () => {
+      try {
+         setLoading(true);
+
+         if (searchEvent.trim()) {
+            const data = await ApiService.searchEvents(searchEvent);
+            setEvents(data);
+         } else {
+            const data = await ApiService.getEvents();
+            setEvents(data);
+         }
+      } catch (error) {
+         console.log("Error searching events:", error);
+      } finally {
+         setLoading(false);
+      }
+   }, [searchEvent]);
 
    // Apply filters to users
    useEffect(() => {
@@ -142,13 +161,18 @@ export default function ConnectionScreen() {
       setFilteredUsers(result);
    }, [users, selectedDistance, selectedGender, ageRange, currentLocation]);
 
+   //ham search
    useEffect(() => {
       const timeoutId = setTimeout(() => {
-         loadUsers();
-      }, 300); // Debounce search
+         if (viewMode === "users") {
+            loadUsers();
+         } else {
+            searchEvents();
+         }
+      }, 300);
 
       return () => clearTimeout(timeoutId);
-   }, [loadUsers]);
+   }, [searchUser, searchEvent, viewMode]);
 
    const onRefresh = useCallback(async () => {
       setRefreshing(true);
@@ -264,7 +288,7 @@ export default function ConnectionScreen() {
    };
 
    const renderEventCard = ({ item }: { item: any }) => {
-      const date = new Date(item.date_start);
+      const date = new Date(item.dateStart);
       const day = date.getDate();
       const month = date.toLocaleString("en-US", { month: "short" });
       const timeStart = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -307,8 +331,8 @@ export default function ConnectionScreen() {
                      {item.address}
                   </Text>
 
-                  <Text style={[styles.eventFee, { color: item.entrance_fee === "Free" ? "#0A8F29" : "#D32F2F" }]}>
-                     {item.entrance_fee || "Free"}
+                  <Text style={[styles.eventFee, { color: item.entranceFee === "Free" ? "#0A8F29" : "#D32F2F" }]}>
+                     {item.entranceFee || "Free"}
                   </Text>
 
                   {item.category && (
@@ -326,21 +350,6 @@ export default function ConnectionScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
          <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <Text style={styles.headerTitle}>Connection</Text>
-         </View>
-
-         <View style={[styles.searchContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-               style={styles.searchInput}
-               placeholder="Search users..."
-               value={searchQuery}
-               onChangeText={setSearchQuery}
-               placeholderTextColor="#999"
-            />
-            <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
-               <Ionicons name="options-outline" size={24} color={colors.primary} />
-               {(selectedDistance || selectedGender) && <View style={styles.filterBadge} />}
-            </TouchableOpacity>
          </View>
 
          <View style={[styles.viewModeToggle, { backgroundColor: colors.card }]}>
@@ -363,7 +372,36 @@ export default function ConnectionScreen() {
                <Text style={[styles.viewModeText, viewMode === "events" && styles.viewModeTextActive]}>All Events</Text>
             </TouchableOpacity>
          </View>
+         <View style={styles.searchWrapper}>
+            <View style={styles.searchBox}>
+               <Ionicons name="search-outline" size={20} color="#666" style={{ marginRight: 8 }} />
 
+               {viewMode === "users" ? (
+                  <TextInput
+                     style={styles.searchInput}
+                     placeholder="Search users..."
+                     value={searchUser}
+                     onChangeText={setsearchUser}
+                     placeholderTextColor="#999"
+                  />
+               ) : (
+                  <TextInput
+                     style={styles.searchInput}
+                     placeholder="Search events..."
+                     value={searchEvent}
+                     onChangeText={setSearchEvent}
+                     placeholderTextColor="#999"
+                  />
+               )}
+
+               {/* Filter chỉ ở tab Users */}
+               {viewMode === "users" && (
+                  <TouchableOpacity style={styles.filterButtonSmall} onPress={() => setShowFilters(true)}>
+                     <Ionicons name="options-outline" size={22} color={colors.primary} />
+                  </TouchableOpacity>
+               )}
+            </View>
+         </View>
          {viewMode === "users" &&
             (loading && !refreshing ? (
                <View style={styles.loadingContainer}>
@@ -528,11 +566,36 @@ const styles = StyleSheet.create({
    searchIcon: {
       marginRight: 8,
    },
+   searchWrapper: {
+      paddingHorizontal: 15,
+      marginTop: 4,
+      marginBottom: 8,
+   },
+   searchBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#fff",
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 14,
+      shadowColor: "#000",
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+   },
+
    searchInput: {
       flex: 1,
-      fontSize: 16,
+      fontSize: 15,
       color: "#333",
    },
+
+   filterButtonSmall: {
+      padding: 4,
+      marginLeft: 6,
+   },
+
    viewModeToggle: {
       flexDirection: "row",
       padding: 12,
@@ -663,6 +726,7 @@ const styles = StyleSheet.create({
       alignItems: "center",
    },
    followingButton: {},
+
    emptyContainer: {
       alignItems: "center",
       justifyContent: "center",

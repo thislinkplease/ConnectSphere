@@ -362,7 +362,14 @@ class ApiService {
    // Event endpoints
    async getEvents(filters?: any): Promise<Event[]> {
       const response = await this.client.get("/events", { params: filters });
-      return response.data;
+
+      return response.data.map((e: any) => ({
+         ...e,
+         dateStart: e.dateStart,
+         dateEnd: e.dateEnd,
+         entranceFee: e.entranceFee,
+         image_url: e.image_url,
+      }));
    }
 
    async getMyEvents(username: string, type: "participating" | "created" = "participating"): Promise<Event[]> {
@@ -395,10 +402,17 @@ class ApiService {
       });
    }
 
-   async searchEvents(query: string): Promise<Event[]> {
-      const response = await this.client.get("/events/search", { params: { q: query } });
-      return response.data;
-   }
+  async searchEvents(query: string): Promise<Event[]> {
+   const response = await this.client.get("/events/search", { params: { q: query } });
+   return response.data.map((e: any) => ({
+      ...e,
+      dateStart: e.dateStart,
+      dateEnd: e.dateEnd,
+      entranceFee: e.entranceFee,
+      image_url: e.image_url,
+   }));
+}
+
 
    async inviteToEvent(eventId: string, inviterUsername: string, inviteeUsernames: string[]): Promise<void> {
       await this.client.post(`/events/${eventId}/invite`, {
@@ -955,7 +969,7 @@ class ApiService {
          params: { username },
       });
       return res.data;
-   } 
+   }
 
    // xóa swipe đã lướt phải
    async deleteRightSwipe(swiper: string, target: string) {
