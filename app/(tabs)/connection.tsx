@@ -431,7 +431,7 @@ export default function ConnectionScreen() {
                   <ActivityIndicator size="large" color={colors.primary} />
                </View>
             ) : (
-               <View>
+               <View style={{ flex: 1 }}>
                   {/*create event */}
                   {currentUser?.isPro ? (
                      <TouchableOpacity

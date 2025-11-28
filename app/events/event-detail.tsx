@@ -101,7 +101,7 @@ export default function EventDetailScreen() {
    /* -------------------------------------------------------------------------- */
 
    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFF9ED" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#fcf4e3ff" }}>
          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             {/* ───────────────────────────── Banner ───────────────────────────── */}
             <View style={styles.bannerContainer}>
