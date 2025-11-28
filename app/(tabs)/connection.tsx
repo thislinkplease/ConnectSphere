@@ -431,13 +431,59 @@ export default function ConnectionScreen() {
                   <ActivityIndicator size="large" color={colors.primary} />
                </View>
             ) : (
-               <FlatList
-                  data={events}
-                  renderItem={renderEventCard}
-                  keyExtractor={(item) => String(item.id)}
-                  contentContainerStyle={{ padding: 12 }}
-                  showsVerticalScrollIndicator={false}
-               />
+               <View>
+                  {/*create event */}
+                  {currentUser?.isPro ? (
+                     <TouchableOpacity
+                        style={{
+                           backgroundColor: colors.primary,
+                           margin: 16,
+                           padding: 12,
+                           borderRadius: 12,
+                           flexDirection: "row",
+                           alignItems: "center",
+                           justifyContent: "center",
+                        }}
+                        onPress={() => router.push("/events/create")}
+                     >
+                        <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                        <Text
+                           style={{
+                              color: "#fff",
+                              marginLeft: 8,
+                              fontSize: 16,
+                              fontWeight: "600",
+                           }}
+                        >
+                           Create Event
+                        </Text>
+                     </TouchableOpacity>
+                  ) : (
+                     <TouchableOpacity
+                        style={{
+                           backgroundColor: "#ccc",
+                           margin: 16,
+                           padding: 12,
+                           borderRadius: 12,
+                           flexDirection: "row",
+                           alignItems: "center",
+                           justifyContent: "center",
+                        }}
+                        onPress={() => Alert.alert("PRO Feature", "Only PRO users can create events.")}
+                     >
+                        <Ionicons name="lock-closed-outline" size={18} color="#333" />
+                        <Text style={{ marginLeft: 8, fontSize: 15 }}>Create Event (PRO)</Text>
+                     </TouchableOpacity>
+                  )}
+                  {/* event list */}
+                  <FlatList
+                     data={events}
+                     renderItem={renderEventCard}
+                     keyExtractor={(item) => String(item.id)}
+                     contentContainerStyle={{ padding: 12 }}
+                     showsVerticalScrollIndicator={false}
+                  />
+               </View>
             ))}
 
          {/* Filter Modal */}
@@ -572,12 +618,11 @@ const styles = StyleSheet.create({
       paddingHorizontal: 15,
       marginTop: 4,
       marginBottom: 8,
-      
    },
    searchBox: {
       flexDirection: "row",
-      marginHorizontal:12,
-      marginVertical:10,
+      marginHorizontal: 12,
+      marginVertical: 10,
       alignItems: "center",
       backgroundColor: "#fff",
       paddingHorizontal: 20,

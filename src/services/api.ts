@@ -390,6 +390,29 @@ class ApiService {
       return response.data;
    }
 
+   async uploadEventImage(file: any): Promise<string> {
+      const formData = new FormData();
+
+      formData.append("image", {
+         uri: file.uri,
+         name: file.name,
+         type: file.type,
+      } as any);
+
+      const response = await this.client.post("/events/upload-image", formData, {
+         headers: {
+            "Content-Type": "multipart/form-data",
+         },
+      });
+
+      return response.data.publicUrl || response.data.url || response.data.image_url;
+   }
+
+   async createEvent(data: any): Promise<Event> {
+      const response = await this.client.post("/events", data);
+      return response.data;
+   }
+
    async getEventById(eventId: string, viewer?: string): Promise<Event> {
       const response = await this.client.get(`/events/${eventId}`, { params: { viewer } });
       return response.data;

@@ -7,6 +7,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/src/context/AuthContext";
 import { StripeProvider } from "@/src/context/StripeContext";
 import { ThemeProvider as AppThemeProvider } from "@/src/context/ThemeContext";
+import Toast from "react-native-toast-message";
 
 export const unstable_settings = {
    initialRouteName: "index",
@@ -52,8 +53,8 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            headerShown: true,
-                           title: 'Community',
-                           headerBackTitle: "Back"
+                           title: "Community",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -87,7 +88,7 @@ export default function RootLayout() {
                         name="account/profile"
                         options={{
                            presentation: "card",
-                           headerBackTitle: "Back"
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -131,8 +132,32 @@ export default function RootLayout() {
                            headerTitle: "People You Liked",
                         }}
                      />
+                     <Stack.Screen
+                        name="events/create"
+                        options={{
+                           presentation: "card",
+                           title: "Create Event",
+                           headerShown: false,
+                        }}
+                     />
+                     <Stack.Screen
+                        name="events/event-detail"
+                        options={{
+                           presentation: "card",
+                           title: "Create Event",
+                           headerShown: false,
+                        }}
+                     /><Stack.Screen
+                        name="events/event-map"
+                        options={{
+                           presentation: "card",
+                           title: "Create Event",
+                           headerShown: false,
+                        }}
+                     />
                   </Stack>
                   <StatusBar style="auto" />
+                  <Toast />
                </ThemeProvider>
             </AppThemeProvider>
          </AuthProvider>
