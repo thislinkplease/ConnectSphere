@@ -11,12 +11,14 @@ import {
    Alert,
    FlatList,
    Image,
+   Keyboard,
    Modal,
    RefreshControl,
    StyleSheet,
    Text,
    TextInput,
    TouchableOpacity,
+   TouchableWithoutFeedback,
    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -288,7 +290,7 @@ export default function ConnectionScreen() {
    };
 
    const renderEventCard = ({ item }: { item: any }) => {
-      const date = new Date(item.dateStart);
+      const date = new Date(item.date_start);
       const day = date.getDate();
       const month = date.toLocaleString("en-US", { month: "short" });
       const timeStart = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -331,13 +333,13 @@ export default function ConnectionScreen() {
                      {item.address}
                   </Text>
 
-                  <Text style={[styles.eventFee, { color: item.entranceFee === "Free" ? "#0A8F29" : "#D32F2F" }]}>
-                     {item.entranceFee || "Free"}
+                  <Text style={[styles.eventFee, { color: item.entrance_fee === "Free" ? "#0A8F29" : "#D32F2F" }]}>
+                     {item.entrance_fee || "Free"}
                   </Text>
 
                   {item.category && (
                      <View style={styles.eventTag}>
-                        <Text style={styles.eventTagText}>{item.category}</Text>
+                        <Text style={styles.eventTagText}>{item.category} </Text>
                      </View>
                   )}
                </View>
@@ -372,7 +374,7 @@ export default function ConnectionScreen() {
                <Text style={[styles.viewModeText, viewMode === "events" && styles.viewModeTextActive]}>All Events</Text>
             </TouchableOpacity>
          </View>
-         <View style={styles.searchWrapper}>
+         <TouchableWithoutFeedback style={styles.searchWrapper} onPress={Keyboard.dismiss}>
             <View style={styles.searchBox}>
                <Ionicons name="search-outline" size={20} color="#666" style={{ marginRight: 8 }} />
 
@@ -401,7 +403,7 @@ export default function ConnectionScreen() {
                   </TouchableOpacity>
                )}
             </View>
-         </View>
+         </TouchableWithoutFeedback>
          {viewMode === "users" &&
             (loading && !refreshing ? (
                <View style={styles.loadingContainer}>
@@ -570,17 +572,20 @@ const styles = StyleSheet.create({
       paddingHorizontal: 15,
       marginTop: 4,
       marginBottom: 8,
+      
    },
    searchBox: {
       flexDirection: "row",
+      marginHorizontal:12,
+      marginVertical:10,
       alignItems: "center",
       backgroundColor: "#fff",
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      borderRadius: 14,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 20,
       shadowColor: "#000",
       shadowOpacity: 0.08,
-      shadowRadius: 6,
+      shadowRadius: 10,
       shadowOffset: { width: 0, height: 3 },
       elevation: 2,
    },
@@ -926,9 +931,8 @@ const styles = StyleSheet.create({
       fontSize: 14,
       fontWeight: "600",
       marginBottom: 3,
-      marginLeft: 35,
+      marginLeft: 45,
    },
-
    eventTag: {
       backgroundColor: "#E6F6EE",
       paddingHorizontal: 10,

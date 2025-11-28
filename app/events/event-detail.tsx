@@ -105,8 +105,8 @@ export default function EventDetailScreen() {
       );
    }
 
-   const startDate = new Date(event.dateStart);
-   const endDate = new Date(event.dateEnd);
+   const startDate = new Date(event.date_start);
+   const endDate = new Date(event.date_end);
    const formattedDateRange = `${startDate.toLocaleDateString("en-GB")} - ${endDate.toLocaleDateString("en-GB")}`;
    const timeStart = startDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
    const timeEnd = endDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -216,7 +216,7 @@ export default function EventDetailScreen() {
                   <View style={styles.feeItem}>
                      <Ionicons name="wallet-outline" size={18} color="#777" />
                      <Text style={styles.feeLabel}>Entrance fee</Text>
-                     <Text style={styles.feeValue}>{event.entranceFee || "Free"}</Text>
+                     <Text style={styles.feeValue}>{event.entrance_fee || "Free"}</Text>
                   </View>
                   <View style={styles.feeDivider} />
                   <View style={styles.feeItem}>

@@ -46,14 +46,14 @@ export interface Event {
    id: string;
    name: string;
    image_url?: string;
-   dateStart: string;
-   dateEnd: string;
+   date_start: string;
+   date_end: string;
    address: string;
    distance?: number; // in km
    participants: User[];
    comments: Comment[];
    hosted_by: String;
-   entranceFee?: string;
+   entrance_fee?: string;
    pricingMenu?: string;
    schedule?: string;
    details?: string;

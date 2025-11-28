@@ -359,16 +359,29 @@ class ApiService {
       return this.deduplicatedGet(`/users/${username}/profile-completion`);
    }
 
-   // Event endpoints
+   async searchEvents(query: string): Promise<Event[]> {
+      const response = await this.client.get("/events/search", { params: { q: query } });
+
+      return response.data.map((e: any) => ({
+         ...e,
+         dateStart: e.date_start,
+         dateEnd: e.date_end,
+         entranceFee: e.entrance_fee,
+         image_url: e.image_url,
+         address: e.address ?? e.location,
+      }));
+   }
+
    async getEvents(filters?: any): Promise<Event[]> {
       const response = await this.client.get("/events", { params: filters });
 
       return response.data.map((e: any) => ({
          ...e,
-         dateStart: e.dateStart,
-         dateEnd: e.dateEnd,
-         entranceFee: e.entranceFee,
+         dateStart: e.date_start,
+         dateEnd: e.date_end,
+         entranceFee: e.entrance_fee,
          image_url: e.image_url,
+         address: e.address ?? e.location,
       }));
    }
 
@@ -401,18 +414,6 @@ class ApiService {
          headers: { "Content-Type": "multipart/form-data" },
       });
    }
-
-  async searchEvents(query: string): Promise<Event[]> {
-   const response = await this.client.get("/events/search", { params: { q: query } });
-   return response.data.map((e: any) => ({
-      ...e,
-      dateStart: e.dateStart,
-      dateEnd: e.dateEnd,
-      entranceFee: e.entranceFee,
-      image_url: e.image_url,
-   }));
-}
-
 
    async inviteToEvent(eventId: string, inviterUsername: string, inviteeUsernames: string[]): Promise<void> {
       await this.client.post(`/events/${eventId}/invite`, {
