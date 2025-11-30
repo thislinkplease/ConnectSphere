@@ -3,8 +3,10 @@ import { useTheme } from "@/src/context/ThemeContext";
 import ApiService from "@/src/services/api";
 import LocationService from "@/src/services/location";
 import { User } from "@/src/types";
+import { fromUTCString } from "@/src/utils/date";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+
 import React, { useCallback, useEffect, useState } from "react";
 import {
    ActivityIndicator,
@@ -290,7 +292,7 @@ export default function ConnectionScreen() {
    };
 
    const renderEventCard = ({ item }: { item: any }) => {
-      const date = new Date(item.date_start);
+      const date = fromUTCString(item.date_start);
       const day = date.getDate();
       const month = date.toLocaleString("en-US", { month: "short" });
       const timeStart = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });

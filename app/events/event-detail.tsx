@@ -7,11 +7,13 @@ import {
    ActivityIndicator,
    Alert,
    Image,
+   Keyboard,
    ScrollView,
    StyleSheet,
    Text,
    TextInput,
    TouchableOpacity,
+   TouchableWithoutFeedback,
    View,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
@@ -33,6 +35,24 @@ export default function EventDetailScreen() {
    const [joining, setJoining] = useState(false);
    const [comment, setComment] = useState("");
    const [sendingComment, setSendingComment] = useState(false);
+   const [showActions, setShowActions] = useState(false);
+   const [showEditModal, setShowEditModal] = useState(false);
+
+   const [editAddress, setEditAddress] = useState("");
+   const [editName, setEditName] = useState("");
+   const [editDescription, setEditDescription] = useState("");
+
+   const [editStart, setEditStart] = useState("");
+   const [editEnd, setEditEnd] = useState("");
+
+   function toUTCString(localDateString: string) {
+      const d = new Date(localDateString);
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+   }
+   function toLocalString(d: string) {
+      const date = new Date(d);
+      return new Date(date.getTime() + date.getTimezoneOffset() * 60000);
+   }
 
    /* ---------------- LOAD EVENT ---------------- */
    const loadEvent = useCallback(async () => {
@@ -52,6 +72,49 @@ export default function EventDetailScreen() {
    useEffect(() => {
       loadEvent();
    }, [loadEvent]);
+
+   //update event
+   const updateEvent = async () => {
+      try {
+         await ApiService.updateEvent(String(eventId), {
+            username: user?.username,
+            address: editAddress,
+            date_start: toUTCString(editStart),
+            date_end: toUTCString(editEnd),
+         });
+
+         setShowEditModal(false);
+         loadEvent();
+      } catch {
+         Alert.alert("Error", "Failed to update event");
+      }
+   };
+   useEffect(() => {
+      if (event) {
+         setEditAddress(event.address);
+         setEditStart(event.date_start);
+         setEditEnd(event.date_end);
+      }
+   }, [event]);
+
+   const deleteEvent = async () => {
+      Alert.alert("Delete Event", "Are you sure you want to delete this event?", [
+         { text: "Cancel", style: "cancel" },
+         {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+               try {
+                  await ApiService.deleteEvent(eventId, user?.username || "");
+                  setShowActions(false);
+                  router.back(); // quay về sau khi xoá
+               } catch (err) {
+                  Alert.alert("Error", "Failed to delete event");
+               }
+            },
+         },
+      ]);
+   };
 
    /* ---------------- ACTIONS ---------------- */
    const join = async (status: "interested") => {
@@ -86,8 +149,8 @@ export default function EventDetailScreen() {
    }
 
    /* ---------------- FORMAT ---------------- */
-   const start = new Date(event.date_start);
-   const end = new Date(event.date_end);
+   const start = toLocalString(event.date_start);
+   const end = toLocalString(event.date_end);
 
    const dateRange = `${start.toLocaleDateString("en-GB")} → ${end.toLocaleDateString("en-GB")}`;
    const timeRange = `${start.toLocaleTimeString("en-US", {
@@ -102,6 +165,81 @@ export default function EventDetailScreen() {
 
    return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#fcf4e3ff" }}>
+         {/* === OVERLAYS HERE === */}
+         {showActions && (
+            <View style={[styles.actionSheet, { zIndex: 1000, elevation: 1000 }]}>
+               <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => {
+                     setShowActions(false);
+                     setShowEditModal(true);
+                  }}
+               >
+                  <Text style={styles.actionText}>Edit event</Text>
+               </TouchableOpacity>
+
+               <TouchableOpacity style={styles.actionBtnDanger} onPress={deleteEvent}>
+                  <Text style={styles.actionTextDanger}>Delete event</Text>
+               </TouchableOpacity>
+
+               <TouchableOpacity style={styles.actionCancel} onPress={() => setShowActions(false)}>
+                  <Text style={styles.actionText}>Cancel</Text>
+               </TouchableOpacity>
+            </View>
+         )}
+
+         {showEditModal && (
+            <TouchableWithoutFeedback
+               onPress={() => Keyboard.dismiss}
+               style={[styles.modalOverlay, { zIndex: 1000, elevation: 1000 }]}
+            >
+               <View style={styles.modalBox}>
+                  <Text style={styles.modalTitle}>Edit Event</Text>
+                  <TextInput
+                     style={styles.input}
+                     placeholder="Event name"
+                     value={editName}
+                     onChangeText={setEditName}
+                  />
+
+                  <TextInput
+                     style={styles.input}
+                     placeholder="Description"
+                     value={editDescription}
+                     onChangeText={setEditDescription}
+                  />
+
+                  <TextInput
+                     style={styles.input}
+                     placeholder="Address"
+                     value={editAddress}
+                     onChangeText={setEditAddress}
+                  />
+
+                  <TextInput
+                     style={styles.input}
+                     placeholder="Start date (YYYY-MM-DD HH:mm)"
+                     value={editStart}
+                     onChangeText={setEditStart}
+                  />
+
+                  <TextInput
+                     style={styles.input}
+                     placeholder="End date (YYYY-MM-DD HH:mm)"
+                     value={editEnd}
+                     onChangeText={setEditEnd}
+                  />
+
+                  <TouchableOpacity style={styles.updateBtn} onPress={updateEvent}>
+                     <Text style={styles.updateText}>Save changes</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                     <Text style={styles.cancelText}>Cancel</Text>
+                  </TouchableOpacity>
+               </View>
+            </TouchableWithoutFeedback>
+         )}
          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             {/* ───────────────────────────── Banner ───────────────────────────── */}
             <View style={styles.bannerContainer}>
@@ -118,6 +256,14 @@ export default function EventDetailScreen() {
                <Text style={styles.address}>{event.description}</Text>
                <View style={styles.categoryChip}>
                   <Text style={styles.categoryText}>{event.category}</Text>
+               </View>
+
+               <View style={{ position: "absolute", right: 16, top: 16 }}>
+                  {event.hosted_by === user?.username && (
+                     <TouchableOpacity onPress={() => setShowActions(true)}>
+                        <Ionicons name="ellipsis-horizontal" size={24} color="#111" />
+                     </TouchableOpacity>
+                  )}
                </View>
 
                <View style={styles.infoRow}>
@@ -454,5 +600,105 @@ const styles = StyleSheet.create({
       fontSize: 13,
       fontWeight: "600",
       color: "#04c631ff",
+   },
+   actionSheet: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: "#fff",
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      padding: 16,
+      elevation: 10,
+   },
+
+   actionBtn: {
+      paddingVertical: 14,
+   },
+
+   actionBtnDanger: {
+      paddingVertical: 14,
+   },
+
+   actionText: {
+      fontSize: 16,
+      textAlign: "center",
+      color: "#111",
+   },
+
+   actionTextDanger: {
+      fontSize: 16,
+      textAlign: "center",
+      color: "#DC2626",
+      fontWeight: "700",
+   },
+
+   actionCancel: {
+      paddingVertical: 14,
+      marginTop: 6,
+      borderTopWidth: 1,
+      borderColor: "#E5E7EB",
+   },
+   modalOverlay: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+      zIndex: 999,
+   },
+
+   modalBox: {
+      width: "100%",
+      backgroundColor: "#fff",
+      borderRadius: 16,
+      padding: 20,
+      elevation: 10,
+   },
+
+   modalTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#111",
+      marginBottom: 16,
+      textAlign: "center",
+   },
+
+   input: {
+      width: "100%",
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: 10,
+      backgroundColor: "#F9FAFB",
+      fontSize: 14,
+      marginBottom: 16,
+   },
+
+   updateBtn: {
+      backgroundColor: "#F97316",
+      paddingVertical: 12,
+      borderRadius: 10,
+      marginTop: 4,
+   },
+
+   updateText: {
+      textAlign: "center",
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 15,
+   },
+
+   cancelText: {
+      marginTop: 14,
+      textAlign: "center",
+      color: "#6B7280",
+      fontSize: 14,
    },
 });

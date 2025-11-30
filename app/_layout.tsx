@@ -32,6 +32,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Notifications",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -123,6 +124,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            headerTitle: "Online Users",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -130,6 +132,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            headerTitle: "People You Liked",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -147,12 +150,14 @@ export default function RootLayout() {
                            title: "Create Event",
                            headerShown: false,
                         }}
-                     /><Stack.Screen
+                     />
+                     <Stack.Screen
                         name="events/event-map"
                         options={{
                            presentation: "card",
                            title: "Create Event",
                            headerShown: false,
+                           headerBackTitle: "Back",
                         }}
                      />
                   </Stack>

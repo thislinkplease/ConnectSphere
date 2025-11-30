@@ -23,6 +23,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useTheme } from "@/src/context/ThemeContext";
 import ApiService from "@/src/services/api";
 import LocationService from "@/src/services/location";
+import { toUTCString } from "@/src/utils/date";
 
 const EVENT_CATEGORIES = ["Music", "Nightlife", "Food & Drink", "Workshop", "Meetup", "Outdoor", "Other"];
 
@@ -165,8 +166,8 @@ export default function CreateEventScreen() {
             description,
             details: details || description,
             address,
-            date_start: startDate!.toISOString(),
-            date_end: endDate!.toISOString(),
+            date_start: toUTCString(startDate!),
+            date_end: toUTCString(endDate!),
             image_url: imageUrl,
             category: category || "Other",
             entrance_fee: isFree ? "Free" : entranceFee || "Paid",

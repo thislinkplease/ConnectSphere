@@ -1,3 +1,4 @@
+import { fromUTCString } from "@/src/utils/date";
 import axios, { AxiosInstance } from "axios";
 import {
    Chat,
@@ -12,7 +13,6 @@ import {
    SignupData,
    User,
 } from "../types";
-
 // Base API configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://api.example.com";
 
@@ -412,10 +412,24 @@ class ApiService {
       const response = await this.client.post("/events", data);
       return response.data;
    }
+   async updateEvent(eventId: string, data: any): Promise<Event> {
+      const res = await this.client.put(`/events/${eventId}`, data);
+      return res.data;
+   }
+   async deleteEvent(eventId: string, username: string): Promise<any> {
+      const res = await this.client.delete(`/events/${eventId}`, {
+         params: { username },
+      });
+      return res.data;
+   }
 
    async getEventById(eventId: string, viewer?: string): Promise<Event> {
       const response = await this.client.get(`/events/${eventId}`, { params: { viewer } });
-      return response.data;
+      return {
+         ...response.data,
+         date_start: fromUTCString(response.data.date_start),
+         date_end: fromUTCString(response.data.date_end),
+      };
    }
 
    async joinEvent(eventId: string, username: string, status: "going" | "interested" = "going"): Promise<void> {
