@@ -115,7 +115,10 @@ export default function EventDetailScreen() {
             {/* ───────────────────────────── Title Block ───────────────────────────── */}
             <View style={styles.titleBlock}>
                <Text style={styles.eventName}>{event.name}</Text>
-               <Text style={styles.address}>{event.address}</Text>
+               <Text style={styles.address}>{event.description}</Text>
+               <View style={styles.categoryChip}>
+                  <Text style={styles.categoryText}>{event.category}</Text>
+               </View>
 
                <View style={styles.infoRow}>
                   <Info icon="calendar-outline" text={dateRange} />
@@ -435,5 +438,21 @@ const styles = StyleSheet.create({
       marginTop: 4,
       fontSize: 11,
       color: "#9CA3AF",
+   },
+   categoryChip: {
+      alignSelf: "flex-start",
+      paddingVertical: 6,
+      paddingHorizontal: 14,
+      backgroundColor: "#25fa2115",
+      borderRadius: 999,
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: "#33860633",
+   },
+
+   categoryText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: "#04c631ff",
    },
 });

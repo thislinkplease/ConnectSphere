@@ -168,7 +168,7 @@ export default function CreateEventScreen() {
             date_start: startDate!.toISOString(),
             date_end: endDate!.toISOString(),
             image_url: imageUrl,
-
+            category: category || "Other",
             entrance_fee: isFree ? "Free" : entranceFee || "Paid",
             has_pricing_menu: hasPricingMenu,
             is_recurring: false,

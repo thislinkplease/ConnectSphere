@@ -336,12 +336,6 @@ export default function ConnectionScreen() {
                   <Text style={[styles.eventFee, { color: item.entrance_fee === "Free" ? "#0A8F29" : "#D32F2F" }]}>
                      {item.entrance_fee || "Free"}
                   </Text>
-
-                  {item.category && (
-                     <View style={styles.eventTag}>
-                        <Text style={styles.eventTagText}>{item.category} </Text>
-                     </View>
-                  )}
                </View>
             </View>
          </TouchableOpacity>
