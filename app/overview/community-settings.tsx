@@ -590,20 +590,20 @@ export default function CommunitySettingsScreen() {
 
       {activeTab === 'posts' && (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-          {loadingPosts && <Text>Loading posts…</Text>}
+          {loadingPosts && <Text style={{ color: colors.text }}>Loading posts…</Text>}
 
           {/* --- PENDING --- */}
           {(isAdmin || isModerator) && (
             <>
-              <Text style={styles.sectionTitle}>Pending ({pendingPosts.length})</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Pending ({pendingPosts.length})</Text>
               {pendingPosts.map((p) => (
-                <View key={p.id} style={styles.postCard}>
+                <View key={p.id} style={[styles.postCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   {/* Header + content */}
                   <View style={styles.postHeader}>
-                    <Text style={styles.postAuthorName}>{p.authorDisplayName || p.author_username}</Text>
-                    <Text style={styles.postDate}>{new Date(p.created_at).toLocaleString()}</Text>
+                    <Text style={[styles.postAuthorName, { color: colors.text }]}>{p.authorDisplayName || p.author_username}</Text>
+                    <Text style={[styles.postDate, { color: colors.textMuted }]}>{new Date(p.created_at).toLocaleString()}</Text>
                   </View>
-                  {!!p.content && <Text style={styles.postContent}>{p.content}</Text>}
+                  {!!p.content && <Text style={[styles.postContent, { color: colors.text }]}>{p.content}</Text>}
                   {p.post_media?.[0]?.media_url ? (
                     <Image source={{ uri: p.post_media[0].media_url }} style={styles.postImage} />
                   ) : null}
@@ -613,7 +613,7 @@ export default function CommunitySettingsScreen() {
                     <Button
                       mode="contained"
                       onPress={() => handleApprovePost(p.id)}
-                      style={[styles.actionBtn, styles.approveBtn]}
+                      style={[styles.actionBtn, { backgroundColor: colors.primary }]}
                     >
                       Approve
                     </Button>
@@ -621,8 +621,8 @@ export default function CommunitySettingsScreen() {
                     <Button
                       mode="outlined"
                       onPress={() => handleRejectPost(p.id)}
-                      style={[styles.actionBtn, styles.rejectBtn]}
-                      textColor="#ef4444"
+                      style={[styles.actionBtn, { borderColor: colors.error || '#ef4444' }]}
+                      textColor={colors.error || "#ef4444"}
                     >
                       Reject
                     </Button>
@@ -635,9 +635,9 @@ export default function CommunitySettingsScreen() {
           <View style={styles.divider} />
 
           {/* --- APPROVED --- */}
-          <Text style={styles.sectionTitle}>Approved ({approvedPosts.length})</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Approved ({approvedPosts.length})</Text>
           {approvedPosts.map((p) => (
-            <View key={p.id} style={styles.postCard}>
+            <View key={p.id} style={[styles.postCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
 
               {/* DELETE */}
               <TouchableOpacity
@@ -699,7 +699,7 @@ export default function CommunitySettingsScreen() {
           ))}
 
           {(!loadingPosts && approvedPosts.length === 0 && (!isAdmin || pendingPosts.length === 0)) && (
-            <Text>No posts yet.</Text>
+            <Text style={{ color: colors.textMuted }}>No posts yet.</Text>
           )}
         </ScrollView>
       )}
@@ -1005,12 +1005,10 @@ const styles = StyleSheet.create({
   },
   postCard: { 
     position:'relative', 
-    borderWidth:1, 
-    borderColor:'#E5E7EB', 
+    borderWidth:1,
     borderRadius:12, 
     padding:12, 
-    marginBottom:12, 
-    backgroundColor:'#fff' 
+    marginBottom:12,
   },
   rowActions: {
     flexDirection: 'row',
@@ -1021,14 +1019,6 @@ const styles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     borderRadius: 12,
-  },
-  approveBtn: {
-    marginLeft: 6,
-    backgroundColor: '#1c79f3ff',
-  },
-  rejectBtn: {
-    marginRight: 6,
-    borderColor: '#ef4444',
   },
   divider: {
     height: 1, 

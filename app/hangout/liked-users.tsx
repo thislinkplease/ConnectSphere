@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, FlatList, Image, TouchableOpacity, StyleSheet } from "react-native";
 import ApiService from "@/src/services/api";
 import { useAuth } from "@/src/context/AuthContext";
+import { useTheme } from "@/src/context/ThemeContext";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function LikedUsersScreen() {
   const { user: currentUser } = useAuth();
+  const { colors } = useTheme();
   const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,33 +52,33 @@ export default function LikedUsersScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1, padding: 16, backgroundColor: colors.background }}>
       {/* <Text style={styles.title}>People You Liked</Text> */}
       <FlatList
         data={users}
         keyExtractor={(item) => item.username}
         renderItem={({ item }) => (
-          <View style={styles.userRow}>
+          <View style={[styles.userRow, { backgroundColor: colors.card }]}>
             <Image source={{ uri: item.avatar || item.backgroundImage }} style={styles.avatar} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.username}>@{item.username}</Text>
+              <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
+              <Text style={[styles.username, { color: colors.textSecondary }]}>@{item.username}</Text>
             </View>
 
             {/* VIEW PROFILE */}
             <TouchableOpacity onPress={() => router.push(`/account/profile?username=${item.username}`)}>
-              <Ionicons name="person-circle-outline" size={28} color="#007AFF" />
+              <Ionicons name="person-circle-outline" size={28} color={colors.primary} />
             </TouchableOpacity>
 
             {/* DELETE */}
             <TouchableOpacity onPress={() => deleteSwipe(item.username)} style={{ marginLeft: 15 }}>
-              <Ionicons name="trash-outline" size={26} color="red" />
+              <Ionicons name="trash-outline" size={26} color={colors.error} />
             </TouchableOpacity>
           </View>
         )}

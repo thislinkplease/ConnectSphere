@@ -3,18 +3,20 @@ import {
   View, Text, TextInput, ScrollView, Image, Pressable, StyleSheet, Alert, Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Button, Switch } from 'react-native-paper';
+import { Button } from 'react-native-paper';
 import { AntDesign } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ApiService from '@/src/services/api';
 import communityService from '@/src/services/communityService';
 import type { LocalMediaFile, Community } from '@/src/types';
 import { postService } from '@/src/services/postService';
+import { useTheme } from '@/src/context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 export default function PostScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{
     communityId?: string;
     edit?: string;
@@ -227,14 +229,14 @@ export default function PostScreen() {
 
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.title}>Post to {community?.name || 'Community'}</Text>
+    <ScrollView style={[styles.container, { backgroundColor: colors.card }]} contentContainerStyle={{ padding: 16 }}>
+      <Text style={[styles.title, { color: colors.text }]}>Post to {community?.name || 'Community'}</Text>
 
       {/* Caption */}
       <TextInput
-        style={styles.captionInput}
+        style={[styles.captionInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
         placeholder="Write something..."
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textMuted}
         multiline
         value={caption}
         onChangeText={setCaption}
@@ -245,9 +247,9 @@ export default function PostScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
           {selectedMedia.map((m, idx) => (
             <View key={idx} style={styles.imageWrap}>
-              <Image source={{ uri: m.uri }} style={styles.previewImage} />
+              <Image source={{ uri: m.uri }} style={[styles.previewImage, { backgroundColor: colors.border }]} />
               <Pressable style={styles.removeBtn} onPress={() => handleRemoveImage(idx)}>
-                <AntDesign name="close-circle" size={20} color="#f87171" />
+                <AntDesign name="close-circle" size={20} color={colors.error || "#f87171"} />
               </Pressable>
             </View>
           ))}
@@ -255,15 +257,15 @@ export default function PostScreen() {
       )}
 
       <Pressable onPress={handlePickMedia} style={styles.addMediaBtn}>
-        <AntDesign name="plus-circle" size={22} />
-        <Text style={styles.addMediaText}>Add photo / video</Text>
+        <AntDesign name="plus-circle" size={22} color={colors.primary} />
+        <Text style={[styles.addMediaText, { color: colors.text }]}>Add photo / video</Text>
       </Pressable>
 
       <Button
         mode="contained"
         onPress={onSubmit}
         disabled={isSubmitting}
-        style={styles.submitBtn}
+        style={[styles.submitBtn, { backgroundColor: colors.primary }]}
       >
         {isSubmitting
           ? (isEditMode ? "Saving..." : "Posting...")
@@ -275,21 +277,21 @@ export default function PostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  title: { fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 12 },
+  container: { flex: 1 },
+  title: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
   captionInput: {
     minHeight: 120,
-    borderWidth: 1, borderColor: '#eee', borderRadius: 12,
-    padding: 12, fontSize: 15, color: '#111',
+    borderWidth: 1, borderRadius: 12,
+    padding: 12, fontSize: 15,
   },
   previewImage: {
-    width: width * 0.85, height: 280, borderRadius: 10, marginRight: 12, backgroundColor: '#eee',
+    width: width * 0.85, height: 280, borderRadius: 10, marginRight: 12,
   },
   imageWrap: { position: 'relative' },
   removeBtn: { position: 'absolute', top: 8, right: 23 },
   addMediaBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 8 },
   addMediaText: { fontSize: 15, fontWeight: '500' },
   optionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  optionLabel: { fontSize: 16, color: '#111' },
-  submitBtn: { marginTop: 24, borderRadius: 25, paddingVertical: 4, backgroundColor: '#038dffff' },
+  optionLabel: { fontSize: 16 },
+  submitBtn: { marginTop: 24, borderRadius: 25, paddingVertical: 4 },
 });

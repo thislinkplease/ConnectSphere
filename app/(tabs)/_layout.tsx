@@ -3,24 +3,26 @@ import React from 'react';
 import { Text, StyleSheet, View } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
 import { Home, UserRound, Compass, MessageCircleMore, Users } from 'lucide-react-native';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/src/context/ThemeContext';
 import { WebSocketStatus } from '@/components/WebSocketStatus';
 
 export default function TabLayout() {
-    const colorScheme = useColorScheme();
+    const { colors } = useTheme();
 
     return (
         <>
             <WebSocketStatus />
             <Tabs
                 screenOptions={{
-                    tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+                    tabBarActiveTintColor: colors.primary,
+                    tabBarInactiveTintColor: colors.textMuted,
                     headerShown: false,
                     tabBarButton: HapticTab,
                     tabBarStyle: {
                         height: 105,
                         paddingTop: 20,
+                        backgroundColor: colors.card,
+                        borderTopColor: colors.border,
                     },
                 }}
             >

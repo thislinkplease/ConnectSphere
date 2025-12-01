@@ -1,8 +1,9 @@
 import ApiService from './api';
-import { Community, Post, PostMedia } from '../types';
+import { Community, Post, PostMedia, ImageFile } from '../types';
 
 export interface CommunityWithMembership extends Community {
   is_member?: boolean;
+  membership_status?: 'pending' | 'approved' | null;
 }
 
 export type CommunityPost = Post & {
@@ -426,6 +427,110 @@ const communityService = {
 
   async rejectPost(communityId: number | string, postId: number | string): Promise<void> {
     return ApiService.rejectPost(String(communityId), String(postId));
+  },
+
+  // --------- COMMUNITY EVENTS ----------
+
+  async getCommunityEvents(
+    communityId: number | string,
+    viewer?: string
+  ): Promise<any[]> {
+    try {
+      const res = await ApiService.client.get(`/communities/${communityId}/events`, {
+        params: { viewer }
+      });
+      return res.data || [];
+    } catch (error) {
+      console.error('Error getting community events:', error);
+      return [];
+    }
+  },
+
+  async getCommunityEvent(
+    communityId: number | string,
+    eventId: number | string,
+    viewer?: string
+  ): Promise<any> {
+    const res = await ApiService.client.get(`/communities/${communityId}/events/${eventId}`, {
+      params: { viewer }
+    });
+    return res.data;
+  },
+
+  async createCommunityEvent(
+    communityId: number | string,
+    data: {
+      name: string;
+      description?: string;
+      location?: string;
+      start_time: string;
+      end_time?: string;
+      image?: ImageFile;
+    }
+  ): Promise<any> {
+    const formData = new FormData();
+    formData.append('name', data.name);
+    if (data.description) formData.append('description', data.description);
+    if (data.location) formData.append('location', data.location);
+    formData.append('start_time', data.start_time);
+    if (data.end_time) formData.append('end_time', data.end_time);
+    if (data.image) formData.append('image', data.image as any);
+
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/events`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return res.data;
+  },
+
+  async updateCommunityEvent(
+    communityId: number | string,
+    eventId: number | string,
+    data: {
+      name?: string;
+      description?: string;
+      location?: string;
+      start_time?: string;
+      end_time?: string;
+    }
+  ): Promise<any> {
+    const res = await ApiService.client.put(
+      `/communities/${communityId}/events/${eventId}`,
+      data
+    );
+    return res.data;
+  },
+
+  async deleteCommunityEvent(
+    communityId: number | string,
+    eventId: number | string
+  ): Promise<void> {
+    await ApiService.client.delete(`/communities/${communityId}/events/${eventId}`);
+  },
+
+  async respondToCommunityEvent(
+    communityId: number | string,
+    eventId: number | string,
+    status: 'going' | 'interested' | 'not_going'
+  ): Promise<any> {
+    const res = await ApiService.client.post(
+      `/communities/${communityId}/events/${eventId}/respond`,
+      { status }
+    );
+    return res.data;
+  },
+
+  async getCommunityEventParticipants(
+    communityId: number | string,
+    eventId: number | string,
+    status?: 'going' | 'interested'
+  ): Promise<any[]> {
+    const res = await ApiService.client.get(
+      `/communities/${communityId}/events/${eventId}/participants`,
+      { params: { status } }
+    );
+    return res.data || [];
   }
   
 };

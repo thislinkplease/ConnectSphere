@@ -52,7 +52,7 @@ export interface Event {
    distance?: number; // in km
    participants: User[];
    comments: Comment[];
-   hosted_by: String;
+   hosted_by: string;
    entranceFee?: string;
    pricingMenu?: string;
    schedule?: string;
@@ -62,6 +62,42 @@ export interface Event {
    timeEnd?: string;
    description?: string;
    category?: string;
+}
+
+// Community Event types (Facebook-style events for communities)
+export interface CommunityEvent {
+   id: number;
+   community_id: number;
+   name: string;
+   description?: string;
+   image_url?: string;
+   location?: string;
+   start_time: string;
+   end_time?: string;
+   created_by: string;
+   created_at: string;
+   updated_at?: string;
+   participant_count?: number;
+   is_going?: boolean;
+   is_interested?: boolean;
+   creator?: {
+      username: string;
+      name?: string;
+      avatar?: string;
+   };
+}
+
+export interface CommunityEventParticipant {
+   id: number;
+   event_id: number;
+   username: string;
+   status: 'going' | 'interested';
+   created_at: string;
+   user?: {
+      username: string;
+      name?: string;
+      avatar?: string;
+   };
 }
 
 
@@ -84,6 +120,13 @@ export interface HangoutActivity {
    id: string;
    label: string;
    icon?: string;
+}
+
+// Image file type for uploads
+export interface ImageFile {
+   uri: string;
+   type: string;
+   name: string;
 }
 
 // Chat related types
