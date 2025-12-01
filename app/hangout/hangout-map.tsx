@@ -1,4 +1,5 @@
 import { useAuth } from "@/src/context/AuthContext";
+import { useTheme } from "@/src/context/ThemeContext";
 import ApiService from "@/src/services/api";
 import { User } from "@/src/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +11,7 @@ import MapView, { Marker } from "react-native-maps";
 
 export default function HangoutMapScreen() {
    const { user: currentUser } = useAuth();
+   const { colors } = useTheme();
    const router = useRouter();
 
    const [users, setUsers] = useState<User[]>([]);
@@ -157,32 +159,32 @@ export default function HangoutMapScreen() {
          </MapView>
 
          {/* Center on me */}
-         <TouchableOpacity style={styles.centerButton} onPress={centerOnMe}>
+         <TouchableOpacity style={[styles.centerButton, { backgroundColor: colors.primary }]} onPress={centerOnMe}>
             <Ionicons name="locate" size={26} color="#fff" />
          </TouchableOpacity>
 
          {/* Popup mini profile */}
          {selectedUser && (
-            <View style={styles.popupContainer}>
+            <View style={[styles.popupContainer, { backgroundColor: colors.card }]}>
                <Image
                   source={{ uri: selectedUser.avatar || selectedUser.backgroundImage }}
                   style={styles.popupAvatar}
                />
 
                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.popupName} numberOfLines={1}>
+                  <Text style={[styles.popupName, { color: colors.text }]} numberOfLines={1}>
                      {selectedUser.name}
                   </Text>
                   {!!selectedUser.city && !!selectedUser.country && (
-                     <Text style={styles.popupCity} numberOfLines={1}>
+                     <Text style={[styles.popupCity, { color: colors.textSecondary }]} numberOfLines={1}>
                         {selectedUser.city}, {selectedUser.country}
                      </Text>
                   )}
-                  {distanceKm !== null && <Text style={styles.popupDistance}>~{distanceKm.toFixed(1)} km away</Text>}
+                  {distanceKm !== null && <Text style={[styles.popupDistance, { color: colors.textMuted }]}>~{distanceKm.toFixed(1)} km away</Text>}
 
                   <View style={styles.popupButtonsRow}>
                      <TouchableOpacity
-                        style={[styles.popupButton, styles.viewProfileButton]}
+                        style={[styles.popupButton, { backgroundColor: colors.primary }]}
                         onPress={() => handleViewProfile(selectedUser)}
                      >
                         <Ionicons name="person-circle-outline" size={18} color="#fff" />
@@ -200,7 +202,7 @@ export default function HangoutMapScreen() {
                </View>
 
                <TouchableOpacity onPress={() => setSelectedUser(null)} style={styles.popupClose}>
-                  <Ionicons name="close" size={22} color="#333" />
+                  <Ionicons name="close" size={22} color={colors.text} />
                </TouchableOpacity>
             </View>
          )}
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
       position: "absolute",
       bottom: 150,
       right: 25,
-      backgroundColor: "#007AFF",
+      // backgroundColor applied dynamically via inline style using colors.primary
       width: 60,
       height: 60,
       borderRadius: 50,
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
       borderRadius: 20,
    },
    viewProfileButton: {
-      backgroundColor: "#007AFF",
+      // backgroundColor applied dynamically via inline style using colors.primary
    },
    routeButton: {
       backgroundColor: "#34C759",

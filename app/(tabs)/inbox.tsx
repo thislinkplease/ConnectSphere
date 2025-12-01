@@ -40,6 +40,10 @@ export default function InboxScreen() {
         if (c?.id != null) {
           WebSocketService.joinConversation(String(c.id));
         }
+        // Also join community chat rooms for community conversations
+        if (c?.type === 'community' && c?.communityId) {
+          WebSocketService.joinCommunityChat(c.communityId);
+        }
       });
     } catch (error) {
       console.error('Error loading chats:', error);
@@ -55,7 +59,7 @@ export default function InboxScreen() {
   // Note: Removed useFocusEffect reload since WebSocket provides real-time updates
   // No need to reload when returning to the tab - conversations update automatically
 
-  // WebSocket real-time updates  for new messages
+  // WebSocket real-time updates for new messages (both DM and Community)
   useEffect(() => {
     if (!user?.username) return;
 
@@ -237,12 +241,83 @@ export default function InboxScreen() {
       });
     };
 
-    // Listen to new messages
+    // Handle new community messages to update conversation list
+    const handleNewCommunityMessage = (message: any) => {
+      const communityId = message.communityId || message.community_id;
+      if (!communityId) return;
+
+      const senderId = message.sender_username || message.senderId || message.sender?.username;
+      
+      setChats(prevChats => {
+        // Find the community conversation
+        const existingIndex = prevChats.findIndex(
+          c => c.type === 'community' && c.communityId === Number(communityId)
+        );
+        
+        if (existingIndex >= 0) {
+          // Update existing community conversation
+          const updatedChats = [...prevChats];
+          const existingChat = updatedChats[existingIndex];
+          
+          // Build sender info from message
+          const senderInfo = message.sender || {
+            id: senderId || 'unknown',
+            username: senderId || 'unknown',
+            name: message.sender?.name || senderId || 'Unknown User',
+            email: `${senderId || 'unknown'}@example.com`,
+            avatar: message.sender?.avatar || '',
+            country: '',
+            city: '',
+            status: 'Chilling',
+            languages: [],
+            interests: [],
+          };
+          
+          // CRITICAL: Always use server timestamp
+          const messageTimestamp = message.timestamp || message.created_at;
+          
+          const updatedChat = {
+            ...existingChat,
+            lastMessage: {
+              id: String(message.id || Date.now()),
+              chatId: String(existingChat.id),
+              senderId: senderId || 'unknown',
+              sender: senderInfo,
+              content: message.content || '',
+              timestamp: messageTimestamp || '',
+              read: false,
+            },
+            // Increment unread count if message is from someone else
+            unreadCount: senderId !== user.username 
+              ? (existingChat.unreadCount || 0) + 1 
+              : existingChat.unreadCount || 0,
+          };
+          
+          // Remove from current position and add to top
+          updatedChats.splice(existingIndex, 1);
+          updatedChats.unshift(updatedChat);
+          
+          return updatedChats;
+        } else {
+          // New community conversation - reload to get proper data
+          setTimeout(() => {
+            loadChats();
+          }, 300);
+          return prevChats;
+        }
+      });
+    };
+
+    // Listen to new messages (DM)
     WebSocketService.onNewMessage(handleNewMessage);
+    
+    // Listen to new community messages
+    WebSocketService.onNewCommunityMessage(handleNewCommunityMessage);
 
     return () => {
-      // Clean up listener
+      // Clean up listeners
       WebSocketService.off('new_message', handleNewMessage);
+      WebSocketService.off('new_community_message', handleNewCommunityMessage);
     };
   }, [user?.username, user, loadChats]);
 
@@ -255,7 +330,12 @@ export default function InboxScreen() {
     } catch (e) {
       console.warn('mark read failed:', e);
     } finally {
-      router.push(`/inbox/chat?id=${chat.id}`);
+      // Route to community chat if it's a community conversation
+      if (chat.type === 'community' && chat.communityId) {
+        router.push(`/overview/community-chat?id=${chat.communityId}&name=${encodeURIComponent(chat.name || 'Community Chat')}`);
+      } else {
+        router.push(`/inbox/chat?id=${chat.id}`);
+      }
     }
   }, [router, user?.username]);
 

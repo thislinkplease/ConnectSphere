@@ -5,6 +5,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { formatCount, formatToVietnamTime } from '@/src/utils/date';
 import type { Post } from '@/src/types';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/src/context/ThemeContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -47,6 +48,7 @@ export default function PostItem({
   meUsername
 }: PostItemProps) {
   const router = useRouter();
+  const { colors } = useTheme();
   const [isLiked, setIsLiked] = useState<boolean>(!!initialIsLiked);
   const [likeCount, setLikeCount] = useState<number>(post?.like_count ?? 0);
   const isOwner = meUsername === post.author_username;
@@ -79,7 +81,7 @@ export default function PostItem({
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.card }]}>
 
       {/* Header */}
       <View style={styles.headerRow}>
@@ -87,24 +89,24 @@ export default function PostItem({
           {avatarUri ? (
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
           ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person-circle-outline" size={40} color="#999" />
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
+              <Ionicons name="person-circle-outline" size={40} color={colors.textMuted} />
             </View>
           )}
         </Pressable>
 
         <Pressable style={{ flex: 1 }} onPress={handleProfileNavigation}>
-          <Text style={styles.username} numberOfLines={1}>
+          <Text style={[styles.username, { color: colors.text }]} numberOfLines={1}>
             {displayName}
             {post?.community_name ? (
-              <Text style={styles.inCommunity}>  in &quot;{post.community_name}&quot;</Text>
+              <Text style={[styles.inCommunity, { color: colors.textSecondary }]}>  in &quot;{post.community_name}&quot;</Text>
             ) : null}
           </Text>
         </Pressable>
 
         {showMoreMenu && (
           <Pressable hitSlop={8} onPress={() => openActionMenu(post, isOwner, onEditClick, onDeleteClick)}>
-            <Feather name="more-vertical" size={22} color="#111" />
+            <Feather name="more-vertical" size={22} color={colors.text} />
           </Pressable>
         )}
 
@@ -147,13 +149,13 @@ export default function PostItem({
       {/* Actions */}
       <View style={styles.actionsRow}>
         <Pressable style={styles.action} onPress={onLikePress} hitSlop={8}>
-          <AntDesign name={isLiked ? 'heart' : 'heart'} size={22} color={isLiked ? '#EF4444' : '#111'} />
-          <Text style={styles.actionCount}>{formatCount(likeCount)}</Text>
+          <AntDesign name={isLiked ? 'heart' : 'heart'} size={22} color={isLiked ? '#EF4444' : colors.text} />
+          <Text style={[styles.actionCount, { color: colors.text }]}>{formatCount(likeCount)}</Text>
         </Pressable>
 
         <Pressable style={[styles.action, { marginLeft: 16 }]} onPress={() => onCommentClick?.(post)} hitSlop={8}>
-          <Ionicons name="chatbubble-outline" size={22} color="#111" />
-          <Text style={styles.actionCount}>{formatCount(post?.comment_count ?? 0)}</Text>
+          <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
+          <Text style={[styles.actionCount, { color: colors.text }]}>{formatCount(post?.comment_count ?? 0)}</Text>
         </Pressable>
       </View>
 
@@ -162,16 +164,16 @@ export default function PostItem({
         <View style={styles.captionWrap}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             <Pressable onPress={handleProfileNavigation}>
-              <Text style={styles.captionUser}>{displayName} </Text>
+              <Text style={[styles.captionUser, { color: colors.text }]}>{displayName} </Text>
             </Pressable>
-            {!!caption && <Text style={styles.captionText} numberOfLines={2}>{caption}</Text>}
+            {!!caption && <Text style={[styles.captionText, { color: colors.text }]} numberOfLines={2}>{caption}</Text>}
           </View>
 
-          <Text style={styles.timeAgo}>{timeAgo}</Text>
+          <Text style={[styles.timeAgo, { color: colors.textMuted }]}>{timeAgo}</Text>
         </View>
       ) : null}
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: colors.surfaceVariant }]} />
 
     </View>
   );
@@ -213,7 +215,6 @@ function openActionMenu(post: Post, isOwner: boolean, onEditClick?: (post: Post)
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    backgroundColor: '#fff',
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -232,7 +233,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#eee',
   },
   avatarPlaceholder: {
     justifyContent: 'center',
@@ -241,16 +241,13 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#050505', // Facebook black
   },
   inCommunity: {
     fontSize: 13,
-    color: '#65676B', // Facebook gray
     fontWeight: '400',
   },
   timeAgo: {
     fontSize: 12,
-    color: '#65676B',
     marginTop: 2,
   },
 
@@ -258,20 +255,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
-  captionUser: { fontSize: 15, fontWeight: '600', color: '#050505' },
-  captionText: { fontSize: 15, color: '#050505', lineHeight: 20 },
+  captionUser: { fontSize: 15, fontWeight: '600' },
+  captionText: { fontSize: 15, lineHeight: 20 },
 
   singleMedia: {
     width: '100%',
     height: 400, // Taller for better visibility
-    backgroundColor: '#f0f2f5',
   },
   multiMedia: {
     width: SCREEN_WIDTH * 0.9,
     height: 350,
     borderRadius: 8,
     marginRight: 8,
-    backgroundColor: '#f0f2f5',
   },
 
   actionsRow: {
@@ -293,7 +288,6 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     fontSize: 14,
-    color: '#65676B',
     fontWeight: '600',
   },
 

@@ -602,6 +602,8 @@ class ApiService {
             lastMessage,
             unreadCount: c.unread_count ?? 0,
             eventId: undefined,
+            communityId: c.community_id ?? undefined,
+            communityAvatar: c.community_avatar ?? undefined,
          } as Chat;
       });
    }

@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import communityService from '@/src/services/communityService';
 import type { Comment, CommentsSheetProps } from '@/src/types';
 import ApiService from '@/src/services/api';
+import { useTheme } from '@/src/context/ThemeContext';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SHEET_H = Math.round(SCREEN_H * 0.66);
@@ -27,6 +28,7 @@ const SHEET_H = Math.round(SCREEN_H * 0.66);
 export default function CommentsSheet(props: CommentsSheetProps) {
   const { visible, onClose, communityId, postId, me } = props;
   const router = useRouter();
+  const { colors } = useTheme();
   const translateY = useRef(new Animated.Value(SHEET_H)).current;
   const [loading, setLoading] = useState(false);
   const [rootComments, setRootComments] = useState<Comment[]>([]);
@@ -395,7 +397,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
   const renderReply = (reply: Comment) => (
     <View key={reply.id} style={styles.replyRow}>
       <View style={{ width: 32, alignItems: 'center' }}>
-        <Ionicons name="return-down-forward" size={18} color="#9ca3af" />
+        <Ionicons name="return-down-forward" size={18} color={colors.textMuted} />
       </View>
 
       <Image
@@ -404,24 +406,24 @@ export default function CommentsSheet(props: CommentsSheetProps) {
             userData[reply.author_username]?.avatar ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.author_username)}&background=random`
         }}
-        style={styles.avatar}
+        style={[styles.avatar, { backgroundColor: colors.border }]}
       />
 
       <View style={{ flex: 1 }}>
         <Pressable
           onLongPress={() => handleLongPressComment(reply)}
           delayLongPress={200}
-          style={styles.commentBubble}
+          style={[styles.commentBubble, { backgroundColor: colors.surface }]}
         >
           <Pressable onPress={() => handlePressUsername(reply.author_username)}>
-            <Text style={styles.usernameText}>{userData[reply.author_username]?.name || reply.author_username}</Text>
+            <Text style={[styles.usernameText, { color: colors.text }]}>{userData[reply.author_username]?.name || reply.author_username}</Text>
           </Pressable>
-          <Text style={styles.contentText}>{reply.content}</Text>
-          <Text style={styles.timeText}>{formattedTime(reply.created_at)}</Text>
+          <Text style={[styles.contentText, { color: colors.text }]}>{reply.content}</Text>
+          <Text style={[styles.timeText, { color: colors.textMuted }]}>{formattedTime(reply.created_at)}</Text>
         </Pressable>
 
         <Pressable onPress={() => setReplyTo(reply)} style={{ marginTop: 6 }}>
-          <Text style={styles.replyAction}>Reply</Text>
+          <Text style={[styles.replyAction, { color: colors.textMuted }]}>Reply</Text>
         </Pressable>
       </View>
     </View>
@@ -437,24 +439,24 @@ export default function CommentsSheet(props: CommentsSheetProps) {
               userData[item.author_username]?.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(item.author_username)}&background=random`
           }}
-          style={styles.avatar}
+          style={[styles.avatar, { backgroundColor: colors.border }]}
         />
 
         <View style={{ flex: 1 }}>
           <Pressable
             onLongPress={() => handleLongPressComment(item)}
             delayLongPress={200}
-            style={styles.commentBubble}
+            style={[styles.commentBubble, { backgroundColor: colors.surface }]}
           >
             <Pressable onPress={() => handlePressUsername(item.author_username)}>
-              <Text style={styles.usernameText}>{userData[item.author_username]?.name || item.author_username}</Text>
+              <Text style={[styles.usernameText, { color: colors.text }]}>{userData[item.author_username]?.name || item.author_username}</Text>
             </Pressable>
-            <Text style={styles.contentText}>{item.content}</Text>
-            <Text style={styles.timeText}>{formattedTime(item.created_at)}</Text>
+            <Text style={[styles.contentText, { color: colors.text }]}>{item.content}</Text>
+            <Text style={[styles.timeText, { color: colors.textMuted }]}>{formattedTime(item.created_at)}</Text>
           </Pressable>
 
           <Pressable onPress={() => setReplyTo(item)} style={{ marginTop: 6 }}>
-            <Text style={styles.replyAction}>Reply</Text>
+            <Text style={[styles.replyAction, { color: colors.textMuted }]}>Reply</Text>
           </Pressable>
 
           {replies.length > 0 && (
@@ -468,7 +470,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
                   onPress={() => loadMoreReplies(item.id)}
                   style={{ paddingVertical: 6 }}
                 >
-                  <Text style={{ color: "#3b82f6", fontSize: 14, marginLeft: 20, }}>
+                  <Text style={{ color: colors.primary, fontSize: 14, marginLeft: 20, }}>
                     View more replies ({replies.length - visibleReplies[item.id]})
                   </Text>
                 </Pressable>
@@ -487,27 +489,27 @@ export default function CommentsSheet(props: CommentsSheetProps) {
       <Animated.View
         style={[
           styles.sheet,
-          { transform: [{ translateY }] }
+          { transform: [{ translateY }], backgroundColor: colors.card }
         ]}
         {...panResponder.panHandlers}
       >
         {/* drag handle */}
         <View style={styles.dragHandleWrap}>
-          <View style={styles.dragHandle} />
+          <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
         </View>
 
         {/* header */}
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Comments</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Comments</Text>
           <Pressable onPress={onClose} hitSlop={10}>
-            <Ionicons name="close" size={22} color="#111" />
+            <Ionicons name="close" size={22} color={colors.text} />
           </Pressable>
         </View>
 
         {/* ===== COMMENT LIST ===== */}
         {loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator />
+            <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
           <FlatList
@@ -517,7 +519,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={{ alignItems: "center", paddingTop: 24 }}>
-                <Text style={{ color: "#9ca3af" }}>Give the first comment!</Text>
+                <Text style={{ color: colors.textMuted }}>Give the first comment!</Text>
               </View>
             }
           />
@@ -525,8 +527,8 @@ export default function CommentsSheet(props: CommentsSheetProps) {
 
         {/* Replying to box */}
         {!!replyTo && (
-          <View style={styles.replyingTo}>
-            <Text style={{ color: '#111' }}>
+          <View style={[styles.replyingTo, { backgroundColor: colors.surface }]}>
+            <Text style={{ color: colors.text }}>
               Replying to{' '}
               <Text
                 style={{ fontWeight: '600', textDecorationLine: 'underline' }}
@@ -537,25 +539,25 @@ export default function CommentsSheet(props: CommentsSheetProps) {
             </Text>
 
             <Pressable onPress={closeReply}>
-              <Ionicons name="close-circle" size={20} color="#6b7280" />
+              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
             </Pressable>
           </View>
         )}
 
         {/* ===== INPUT BAR ===== */}
-        <View style={[styles.inputRow, { marginBottom: keyboardHeight }]}>
+        <View style={[styles.inputRow, { marginBottom: keyboardHeight, backgroundColor: colors.card, borderTopColor: colors.border }]}>
           {me?.avatar ? (
             <Image source={{ uri: me.avatar }} style={styles.inputAvatar} />
           ) : (
-            <View style={[styles.inputAvatar, { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' }]}>
-              <Ionicons name="person" size={20} color="#fff" />
+            <View style={[styles.inputAvatar, { backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="person" size={20} color={colors.textMuted} />
             </View>
           )}
 
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surface, color: colors.text }]}
             placeholder="Add a comment..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textMuted}
             value={input}
             onChangeText={setInput}
             multiline
@@ -565,7 +567,7 @@ export default function CommentsSheet(props: CommentsSheetProps) {
             <Ionicons
               name="send"
               size={22}
-              color={input.trim() ? "#111" : "#d1d5db"}
+              color={input.trim() ? colors.primary : colors.disabled}
             />
           </Pressable>
         </View>
@@ -583,37 +585,35 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     height: SHEET_H,
-    backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     overflow: 'hidden',
   },
   dragHandleWrap: { alignItems: 'center', paddingVertical: 6 },
-  dragHandle: { width: 48, height: 5, borderRadius: 3, backgroundColor: '#e5e7eb', marginTop: 10 },
+  dragHandle: { width: 48, height: 5, borderRadius: 3, marginTop: 10 },
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 8,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
+  headerTitle: { fontSize: 16, fontWeight: '700' },
   commentRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, marginRight: 10, gap: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e5e7eb' },
-  commentBubble: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 10 },
-  usernameText: { fontWeight: '600', color: '#111', marginBottom: 4 },
-  contentText: { color: '#111' },
-  timeText: { marginTop: 6, fontSize: 11, color: '#6b7280' },
-  replyAction: { color: '#6b7280', fontSize: 13 },
+  avatar: { width: 36, height: 36, borderRadius: 18 },
+  commentBubble: { borderRadius: 12, padding: 10 },
+  usernameText: { fontWeight: '600', marginBottom: 4 },
+  contentText: { },
+  timeText: { marginTop: 6, fontSize: 11 },
+  replyAction: { fontSize: 13 },
   replyRow: { flexDirection: 'row', gap: 8, marginLeft: -40, marginRight: 10, marginTop: 8 },
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 10, gap: 10, paddingBottom: 20, paddingTop: 20,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  inputAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#eee' },
-  input: { flex: 1, maxHeight: 100, paddingVertical: 8, color: '#111' },
+  inputAvatar: { width: 30, height: 30, borderRadius: 15 },
+  input: { flex: 1, maxHeight: 100, paddingVertical: 8 },
   replyingTo: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#f9fafb',
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#eee',
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

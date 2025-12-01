@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTheme } from '@/src/context/ThemeContext';
 
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { colors } = useTheme();
   const router = useRouter();
   const segments = useSegments();
 
@@ -28,8 +30,8 @@ export default function Index() {
 
   // Show loading screen while checking auth
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#007AFF" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
     </View>
   );
 }
@@ -39,6 +41,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
 });
