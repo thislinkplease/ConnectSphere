@@ -1,87 +1,111 @@
-Connect Sphere — Frontend (Client)
+# Connect Sphere — Frontend (Client)
 
-Connect Sphere is a social networking application that helps people connect, join communities, share posts, create events, hangout, and chat in a modern and intuitive experience.
-The frontend is built with React Native (Expo) and communicates with a Node.js + Supabase backend to support real-time data, media uploads, community interactions and user management.
+Connect Sphere is a social networking application that enables users to connect, join communities, share posts, participate in events, hang out with others and chat through a clean and modern mobile experience.
 
-1. Tech Stack
+The frontend is built using React Native (Expo) and communicates with a Node.js + Supabase backend to support media uploads, community interactions, user accounts and real-time-like features.
 
-React Native (Expo)
+---
 
-TypeScript
+## 1. Tech Stack
 
-expo-router
+- React Native (Expo)
 
-Axios (ApiService)
+- TypeScript
 
-Supabase Client
+- expo-router
 
-React Context (Auth, Theme)
+- Axios (ApiService)
 
-React Native Paper UI
+- Supabase Client
 
-File Uploads via Backend APIs
+- React Context (Auth, Theme)
 
-2. Setup & Installation
+- React Native Paper UI
+
+- File uploads via backend APIs
+
+---
+
+## 2. Setup & Installation
 Requirements
 
-Node.js 18+
+- Node.js 18+
 
-npm or yarn
+- npm or yarn
 
-Expo CLI
+- Expo CLI
 
-npm install -g expo-cli
+Install Expo CLI:
 
-3. Clone the Project
+`npm install -g expo-cli`
+
+---
+
+## 3. Clone the Project
+```bash
 git clone https://github.com/your-repo/connect-sphere.git
 cd connect-sphere/frontend
+```
 
-4. Install Dependencies
-npm install
+---
 
-5. Environment Variables
+## 4. Install Dependencies
+`npm install`
+
+---
+
+## 5. Environment Variables
 
 Inside the frontend/ directory, create a .env file:
-
-# Example
+```bash
 EXPO_PUBLIC_API_URL=https://your-backend-url.com
 EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=yourkey
+```
 
 
-The app will not run without correct API URLs and Supabase keys.
+The app will not run without valid API URLs and Supabase keys.
 
-6. Run the App
+---
+
+## 6. Run the App
 
 Start the Expo development server:
 
-npm start
+`npm start`
 
+Then choose one of the following:
 
-Then:
+- Press i to launch the iOS simulator
 
-Press “i” to launch iOS Simulator
+- Press a to launch Android
 
-Press “a” to launch Android
+Or open the QR code using the Expo Go app on your phone
 
-Or scan the QR code using Expo Go on your phone
+---
 
-7. Key Features
+## 7. Key Features
 
-User authentication (login, register, token-based sessions)
+- User authentication (login, register, token-based sessions)
 
-User profiles, avatars, cover images
+- User profiles with avatars and cover images
 
-Post creation with text and images
+- Post creation with text and images
 
-Likes, comments, and media viewer
+- Likes, comments, and media viewer
 
-Communities: join, leave, admin/moderator tools
+- Communities: join, leave, admin/moderator tools
 
-Events: create, join, interested
+- Events: create, join, interested
 
-Hangout: swipe suggested users, location-based features
+- Hangout: user suggestions and location features
 
-Community chat and direct user messaging
+- Community chat and private messaging
 
-Pro membership support
+- Pro membership support
+
+---
+
+## 8. Authors 
+
+- Develop by **Arcane Team**
