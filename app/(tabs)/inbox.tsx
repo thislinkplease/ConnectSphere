@@ -458,7 +458,7 @@ export default function InboxScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Text style={styles.headerTitle}>Inbox</Text>
       </View>
@@ -510,6 +510,8 @@ export default function InboxScreen() {
           }
         />
       )}
+
+      <View style={{ height: 5 }} />
     </SafeAreaView>
   );
 }

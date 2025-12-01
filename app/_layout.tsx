@@ -31,6 +31,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Notifications",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -38,6 +39,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Event Details",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -45,6 +47,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Create Post",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -81,6 +84,7 @@ export default function RootLayout() {
                         name="inbox/chat"
                         options={{
                            presentation: "card",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -95,6 +99,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Edit Profile",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -102,6 +107,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Settings",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -109,12 +115,14 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            title: "Pro Features",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
                         name="account/followers-list"
                         options={{
                            presentation: "card",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -122,6 +130,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            headerTitle: "Online Users",
+                           headerBackTitle: "Back",
                         }}
                      />
                      <Stack.Screen
@@ -129,6 +138,7 @@ export default function RootLayout() {
                         options={{
                            presentation: "card",
                            headerTitle: "People You Liked",
+                           headerBackTitle: "Back",
                         }}
                      />
                   </Stack>

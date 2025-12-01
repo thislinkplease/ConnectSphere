@@ -580,7 +580,7 @@ export default function HangoutScreen() {
    }
 
    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
          {/* Header */}
          <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={styles.headerRight}>
@@ -643,7 +643,7 @@ export default function HangoutScreen() {
          {/* Instructions */}
          {users.length > 0 && currentIndex < users.length && (
             <View style={styles.instructions}>
-               <Text style={styles.instructionsText}>Next user • View profile</Text>
+               <Text style={styles.instructionsText}>Swipe left for Next user   •   Swipe right to View profile</Text>
             </View>
          )}
       </SafeAreaView>
@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
    card: {
       position: "absolute",
       width: SCREEN_WIDTH - 40,
-      height: SCREEN_HEIGHT - 250,
+      height: SCREEN_HEIGHT - 260,
       borderRadius: 20,
       overflow: "hidden",
       backgroundColor: "#fff",

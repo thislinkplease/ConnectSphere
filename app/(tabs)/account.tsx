@@ -115,7 +115,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <SafeAreaView style={dynamicStyles.container}>
+    <SafeAreaView style={dynamicStyles.container} edges={["top"]}>
       <ScrollView>
         {/* Profile Header */}
         <View style={styles.profileHeader}>

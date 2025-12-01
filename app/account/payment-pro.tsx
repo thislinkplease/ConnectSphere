@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  ScrollView, 
+  TouchableOpacity, 
+  Alert, 
+  Platform,
+  KeyboardAvoidingView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -258,190 +267,183 @@ export default function PaymentProScreen() {
         }}
       />
       <SafeAreaView style={styles.container}>
-        <ScrollView>
-          {/* Pro Status */}
-          <View style={[styles.statusCard, isPro && styles.statusCardPro]}>
-            <View style={styles.statusHeader}>
-              <Ionicons 
-                name={isPro ? 'star' : 'star-outline'} 
-                size={32} 
-                color={isPro ? '#FFD700' : '#666'} 
-              />
-              <Text style={styles.statusTitle}>
-                {isPro ? 'Pro Member' : 'Free Member'}
-              </Text>
-            </View>
-            {isPro && (
-              <Text style={styles.statusSubtitle}>
-                Thank you for being a Pro member!
-              </Text>
-            )}
-          </View>
-
-          {/* Pro Features */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Pro Features</Text>
-            
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="people" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Extended Friend Limit</Text>
-                <Text style={styles.featureDescription}>
-                  Follow up to 512 people (vs. 16 for free members)
-                </Text>
-              </View>
-              {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="sparkles" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>AI Post Writer</Text>
-                <Text style={styles.featureDescription}>
-                  Use AI to help write engaging posts (Coming Soon)
-                </Text>
-              </View>
-              {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="color-palette" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Exclusive Theme</Text>
-                <Text style={styles.featureDescription}>
-                  Beautiful yellow & white color scheme for Pro members
-                </Text>
-              </View>
-              {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="chatbubbles" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Create Communities</Text>
-                <Text style={styles.featureDescription}>
-                  Create and manage your own communities with group chat
-                </Text>
-              </View>
-              {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
-            </View>
-
-            <View style={styles.featureItem}>
-              <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="flash" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Priority Support</Text>
-                <Text style={styles.featureDescription}>
-                  Get faster response from our support team
-                </Text>
-              </View>
-              {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
-            </View>
-          </View>
-
-          {/* Pricing */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Pricing</Text>
-            <View style={styles.pricingCard}>
-              <Text style={[styles.pricingAmount, { color: colors.primary }]}>$0.01</Text>
-              <Text style={styles.pricingPeriod}>per month (test price)</Text>
-              <Text style={styles.pricingNote}>
-                Test Mode - Using Stripe test payment
-              </Text>
-              <Text style={[styles.pricingNote, { marginTop: 4 }]}>
-                Test card: 4242 4242 4242 4242 (exp: any future date, cvc: any 3 digits)
-              </Text>
-              <Text style={[styles.pricingNote, { marginTop: 4 }]}>
-                You can cancel anytime
-              </Text>
-            </View>
-          </View>
-
-          {/* Payment Method Section (only show if not Pro) */}
-          {!isPro && (
-            <>
-              {/* Platform Pay (Apple Pay / Google Pay) */}
-              {platformPayReady && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>
-                    {Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}
-                  </Text>
-                  <Text style={styles.sectionDescription}>
-                    Quick and secure payment with {Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}
-                  </Text>
-                  <PlatformPayButton
-                    onPress={handlePlatformPayPayment}
-                    type={PlatformPay.ButtonType.Subscribe}
-                    appearance={PlatformPay.ButtonStyle.Black}
-                    borderRadius={12}
-                    style={styles.platformPayButton}
-                    disabled={processing}
-                  />
-                  <Text style={styles.orDivider}>OR</Text>
-                </View>
-              )}
-
-              {/* Card Payment */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Pay with Card</Text>
-                <CardField
-                  postalCodeEnabled={false}
-                  placeholders={{
-                    number: '4242 4242 4242 4242',
-                  }}
-                  cardStyle={{
-                    backgroundColor: '#FFFFFF',
-                    textColor: '#000000',
-                  }}
-                  style={styles.cardField}
-                  onCardChange={(cardDetails) => {
-                    setCardComplete(cardDetails.complete);
-                  }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0} // chỉnh số này nếu có header cao hơn
+        >
+          <ScrollView>
+            {/* Pro Status */}
+            <View style={[styles.statusCard, isPro && styles.statusCardPro]}>
+              <View style={styles.statusHeader}>
+                <Ionicons 
+                  name={isPro ? 'star' : 'star-outline'} 
+                  size={32} 
+                  color={isPro ? '#FFD700' : '#666'} 
                 />
-            
-                
-                <TouchableOpacity 
-                  style={[
-                    styles.subscribeButton, 
-                    { backgroundColor: colors.primary }, 
-                    (processing || !cardComplete) && styles.subscribeButtonDisabled
-                  ]}
-                  onPress={handleStripePayment}
-                  disabled={processing || !cardComplete}
-                >
-                  <Ionicons name="card" size={20} color="#fff" />
-                  <Text style={styles.subscribeButtonText}>
-                    {processing ? 'Processing...' : 'Pay with Card'}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.statusTitle}>
+                  {isPro ? 'Pro Member' : 'Free Member'}
+                </Text>
               </View>
-            </>
-          )}
+              {isPro && (
+                <Text style={styles.statusSubtitle}>
+                  Thank you for being a Pro member!
+                </Text>
+              )}
+            </View>
 
-          {/* Cancel Subscription (if Pro) */}
-          {isPro && (
-            <TouchableOpacity 
-              style={[styles.cancelButton, processing && styles.cancelButtonDisabled]}
-              onPress={handleCancelSubscription}
-              disabled={processing}
-            >
-              <Text style={styles.cancelButtonText}>
-                {processing ? 'Processing...' : 'Cancel Subscription'}
-              </Text>
-            </TouchableOpacity>
-          )}
+            {/* Pro Features */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Pro Features</Text>
+              
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="people" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Extended Follow Limit</Text>
+                  <Text style={styles.featureDescription}>
+                    Follow up to 512 people (vs 16 for free members)
+                  </Text>
+                </View>
+                {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
+              </View>
 
-          <View style={styles.footer} />
-        </ScrollView>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="color-palette" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Exclusive Theme</Text>
+                  <Text style={styles.featureDescription}>
+                    Beautiful yellow & white color scheme for Pro members
+                  </Text>
+                </View>
+                {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
+              </View>
+
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="chatbubbles" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Create Communities</Text>
+                  <Text style={styles.featureDescription}>
+                    Create and manage your own communities with group chat
+                  </Text>
+                </View>
+                {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
+              </View>
+
+              <View style={styles.featureItem}>
+                <View style={[styles.featureIcon, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="flash" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Priority Support</Text>
+                  <Text style={styles.featureDescription}>
+                    Get faster response from our support team
+                  </Text>
+                </View>
+                {isPro && <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />}
+              </View>
+            </View>
+
+            {/* Pricing */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Pricing</Text>
+              <View style={styles.pricingCard}>
+                <Text style={[styles.pricingAmount, { color: colors.primary }]}>$10.00</Text>
+                <Text style={styles.pricingPeriod}>per month (test price)</Text>
+                <Text style={styles.pricingNote}>
+                  Test Mode - Using Stripe test payment
+                </Text>
+                <Text style={[styles.pricingNote, { marginTop: 4 }]}>
+                  Test card: 4242 4242 4242 4242 (exp: any future date, cvc: any 3 digits)
+                </Text>
+                <Text style={[styles.pricingNote, { marginTop: 4 }]}>
+                  You can cancel anytime
+                </Text>
+              </View>
+            </View>
+
+            {/* Payment Method Section (only show if not Pro) */}
+            {!isPro && (
+              <>
+                {/* Platform Pay (Apple Pay / Google Pay) */}
+                {platformPayReady && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>
+                      {Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}
+                    </Text>
+                    <Text style={styles.sectionDescription}>
+                      Quick and secure payment with {Platform.OS === 'ios' ? 'Apple Pay' : 'Google Pay'}
+                    </Text>
+                    <PlatformPayButton
+                      onPress={handlePlatformPayPayment}
+                      type={PlatformPay.ButtonType.Subscribe}
+                      appearance={PlatformPay.ButtonStyle.Black}
+                      borderRadius={12}
+                      style={styles.platformPayButton}
+                      disabled={processing}
+                    />
+                    <Text style={styles.orDivider}>OR</Text>
+                  </View>
+                )}
+
+                {/* Card Payment */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Pay with Card</Text>
+                  <CardField
+                    postalCodeEnabled={false}
+                    placeholders={{
+                      number: '4242 4242 4242 4242',
+                    }}
+                    cardStyle={{
+                      backgroundColor: '#FFFFFF',
+                      textColor: '#000000',
+                    }}
+                    style={styles.cardField}
+                    onCardChange={(cardDetails) => {
+                      setCardComplete(cardDetails.complete);
+                    }}
+                  />
+              
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.subscribeButton, 
+                      { backgroundColor: colors.primary }, 
+                      (processing || !cardComplete) && styles.subscribeButtonDisabled
+                    ]}
+                    onPress={handleStripePayment}
+                    disabled={processing || !cardComplete}
+                  >
+                    <Ionicons name="card" size={20} color="#fff" />
+                    <Text style={styles.subscribeButtonText}>
+                      {processing ? 'Processing...' : 'Pay with Card'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Cancel Subscription (if Pro) */}
+            {isPro && (
+              <TouchableOpacity 
+                style={[styles.cancelButton, processing && styles.cancelButtonDisabled]}
+                onPress={handleCancelSubscription}
+                disabled={processing}
+              >
+                <Text style={styles.cancelButtonText}>
+                  {processing ? 'Processing...' : 'Cancel Subscription'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.footer} />
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </>
   );

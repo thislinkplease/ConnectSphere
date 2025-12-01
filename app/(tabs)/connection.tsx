@@ -185,7 +185,14 @@ export default function ConnectionScreen() {
       const isFollowing = followingUsers.has(item.id);
 
       return (
-         <TouchableOpacity style={styles.userCard} onPress={() => router.push(`/account/profile?id=${item.id}`)}>
+         <TouchableOpacity style={styles.userCard} onPress={() => {
+            if (item.username === currentUser?.username) {
+               router.push("/account");
+            } else {
+               router.push(`/account/profile?username=${item.username}`);
+            }
+         }}
+         >
             <Image source={{ uri: item.avatar }} style={styles.userAvatar} />
             <View style={styles.userContent}>
                <View style={styles.userHeader}>
@@ -323,7 +330,7 @@ export default function ConnectionScreen() {
    };
 
    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
          <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <Text style={styles.headerTitle}>Connection</Text>
          </View>
@@ -417,38 +424,6 @@ export default function ConnectionScreen() {
                   </View>
 
                   <View style={[styles.filterSection, { borderBottomColor: colors.border }]}>
-                     <Text style={styles.filterLabel}>Distance</Text>
-                     <View style={styles.filterOptions}>
-                        {[1, 2, 5, 10, 20, 50].map((dist) => (
-                           <TouchableOpacity
-                              key={dist}
-                              style={[
-                                 styles.filterOption,
-                                 { borderColor: colors.border },
-                                 selectedDistance === dist && [
-                                    styles.filterOptionActive,
-                                    { borderColor: colors.primary, backgroundColor: colors.primary + "20" },
-                                 ],
-                              ]}
-                              onPress={() => setSelectedDistance(selectedDistance === dist ? null : dist)}
-                           >
-                              <Text
-                                 style={[
-                                    styles.filterOptionText,
-                                    selectedDistance === dist && [
-                                       styles.filterOptionTextActive,
-                                       { color: colors.primary },
-                                    ],
-                                 ]}
-                              >
-                                 {dist}km
-                              </Text>
-                           </TouchableOpacity>
-                        ))}
-                     </View>
-                  </View>
-
-                  <View style={[styles.filterSection, { borderBottomColor: colors.border }]}>
                      <Text style={styles.filterLabel}>Gender</Text>
                      <View style={styles.filterOptions}>
                         {(["Male", "Female"] as const).map((gender) => (
@@ -501,6 +476,7 @@ export default function ConnectionScreen() {
                </View>
             </View>
          </Modal>
+         <View style={{ height: 5 }} />
       </SafeAreaView>
    );
 }

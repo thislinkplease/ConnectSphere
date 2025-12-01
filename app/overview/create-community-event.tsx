@@ -10,7 +10,10 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal, 
+  TouchableWithoutFeedback
 } from 'react-native';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -72,7 +75,8 @@ export default function CreateCommunityEventScreen() {
   };
 
   const onStartDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowStartDatePicker(Platform.OS === 'ios');
+    setShowStartDatePicker(false);
+
     if (selectedDate) {
       // Preserve the time from the current startDate
       const newDate = new Date(selectedDate);
@@ -82,7 +86,7 @@ export default function CreateCommunityEventScreen() {
   };
 
   const onStartTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowStartTimePicker(Platform.OS === 'ios');
+    setShowStartTimePicker(false);
     if (selectedDate) {
       // Preserve the date from the current startDate
       const newDate = new Date(startDate);
@@ -92,7 +96,7 @@ export default function CreateCommunityEventScreen() {
   };
 
   const onEndDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowEndDatePicker(Platform.OS === 'ios');
+    setShowEndDatePicker(false);
     if (selectedDate) {
       const newDate = new Date(selectedDate);
       if (endDate) {
@@ -107,7 +111,7 @@ export default function CreateCommunityEventScreen() {
   };
 
   const onEndTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowEndTimePicker(Platform.OS === 'ios');
+    setShowEndTimePicker(false);
     if (selectedDate && endDate) {
       const newDate = new Date(endDate);
       newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
@@ -351,43 +355,85 @@ export default function CreateCommunityEventScreen() {
       </ScrollView>
 
       {/* Date/Time Pickers */}
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onStartDateChange}
-          minimumDate={new Date()}
-        />
-      )}
+      <DateTimePickerModal
+        isVisible={showStartDatePicker}
+        mode="date"
+        date={startDate}
+        minimumDate={new Date()}
+        onConfirm={(selected) => {
+          const newDate = new Date(selected);
+          newDate.setHours(startDate.getHours(), startDate.getMinutes());
+          setStartDate(newDate);
+          setShowStartDatePicker(false);
+        }}
+        onCancel={() => setShowStartDatePicker(false)}
+        pickerContainerStyleIOS={{
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      />
 
-      {showStartTimePicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onStartTimeChange}
-        />
-      )}
+      <DateTimePickerModal
+        isVisible={showStartTimePicker}
+        mode="time"
+        date={startDate}
+        onConfirm={(selected) => {
+          const now = new Date();
 
-      {showEndDatePicker && endDate && (
-        <DateTimePicker
-          value={endDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onEndDateChange}
-          minimumDate={startDate}
-        />
-      )}
+          const newDate = new Date(startDate);
+          newDate.setHours(selected.getHours(), selected.getMinutes());
 
-      {showEndTimePicker && endDate && (
-        <DateTimePicker
-          value={endDate}
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onEndTimeChange}
-        />
-      )}
+          if (newDate < now) {
+            Alert.alert("Invalid time", "Start time must be in the future.");
+            return;
+          }
+
+          setStartDate(newDate);
+          setShowStartTimePicker(false);
+        }}
+        onCancel={() => setShowStartTimePicker(false)}
+        pickerContainerStyleIOS={{
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      />
+
+      <DateTimePickerModal
+        isVisible={showEndDatePicker}
+        mode="date"
+        date={endDate ?? addHours(startDate, 2)}
+        minimumDate={startDate}
+        onConfirm={(selected) => {
+          const base = endDate ?? addHours(startDate, 2);
+          const newDate = new Date(selected);
+          newDate.setHours(base.getHours(), base.getMinutes());
+          setEndDate(newDate);
+          setShowEndDatePicker(false);
+        }}
+        onCancel={() => setShowEndDatePicker(false)}
+        pickerContainerStyleIOS={{
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      />
+
+      <DateTimePickerModal
+        isVisible={showEndTimePicker}
+        mode="time"
+        date={endDate ?? addHours(startDate, 2)}
+        onConfirm={(selected) => {
+          const base = endDate ?? addHours(startDate, 2);
+          const newDate = new Date(base);
+          newDate.setHours(selected.getHours(), selected.getMinutes());
+          setEndDate(newDate);
+          setShowEndTimePicker(false);
+        }}
+        onCancel={() => setShowEndTimePicker(false)}
+        pickerContainerStyleIOS={{
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      />
     </SafeAreaView>
   );
 }

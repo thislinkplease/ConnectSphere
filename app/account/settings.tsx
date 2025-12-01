@@ -276,7 +276,7 @@ export default function SettingsScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Flat Sphere v1.0.0</Text>
-            <Text style={styles.footerSubtext}>&hearts; Made with 3 chị em cute đáng yêu &hearts;</Text>
+            <Text style={styles.footerSubtext}>&hearts; Made by Arcane Team &hearts;</Text>
           </View>
         </ScrollView>
       </SafeAreaView>

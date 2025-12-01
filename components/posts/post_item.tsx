@@ -149,7 +149,7 @@ export default function PostItem({
       {/* Actions */}
       <View style={styles.actionsRow}>
         <Pressable style={styles.action} onPress={onLikePress} hitSlop={8}>
-          <AntDesign name={isLiked ? 'heart' : 'heart'} size={22} color={isLiked ? '#EF4444' : colors.text} />
+          <AntDesign name={isLiked ? 'heart' : 'heart'} size={22} color={isLiked ? '#EF4444' : '#cdcdcdff'} />
           <Text style={[styles.actionCount, { color: colors.text }]}>{formatCount(likeCount)}</Text>
         </Pressable>
 

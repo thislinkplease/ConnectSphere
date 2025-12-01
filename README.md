@@ -1,50 +1,87 @@
-# Welcome to your Expo app 👋
+Connect Sphere — Frontend (Client)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Connect Sphere is a social networking application that helps people connect, join communities, share posts, create events, hangout, and chat in a modern and intuitive experience.
+The frontend is built with React Native (Expo) and communicates with a Node.js + Supabase backend to support real-time data, media uploads, community interactions and user management.
 
-## Get started
+1. Tech Stack
 
-1. Install dependencies
+React Native (Expo)
 
-   ```bash
-   npm install
-   ```
+TypeScript
 
-2. Start the app
+expo-router
 
-   ```bash
-   npx expo start
-   ```
+Axios (ApiService)
 
-In the output, you'll find options to open the app in a
+Supabase Client
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+React Context (Auth, Theme)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+React Native Paper UI
 
-## Get a fresh project
+File Uploads via Backend APIs
 
-When you're ready, run:
+2. Setup & Installation
+Requirements
 
-```bash
-npm run reset-project
-```
+Node.js 18+
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+npm or yarn
 
-## Learn more
+Expo CLI
 
-To learn more about developing your project with Expo, look at the following resources:
+npm install -g expo-cli
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3. Clone the Project
+git clone https://github.com/your-repo/connect-sphere.git
+cd connect-sphere/frontend
 
-## Join the community
+4. Install Dependencies
+npm install
 
-Join our community of developers creating universal apps.
+5. Environment Variables
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Inside the frontend/ directory, create a .env file:
+
+# Example
+EXPO_PUBLIC_API_URL=https://your-backend-url.com
+EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=yourkey
+
+
+The app will not run without correct API URLs and Supabase keys.
+
+6. Run the App
+
+Start the Expo development server:
+
+npm start
+
+
+Then:
+
+Press “i” to launch iOS Simulator
+
+Press “a” to launch Android
+
+Or scan the QR code using Expo Go on your phone
+
+7. Key Features
+
+User authentication (login, register, token-based sessions)
+
+User profiles, avatars, cover images
+
+Post creation with text and images
+
+Likes, comments, and media viewer
+
+Communities: join, leave, admin/moderator tools
+
+Events: create, join, interested
+
+Hangout: swipe suggested users, location-based features
+
+Community chat and direct user messaging
+
+Pro membership support

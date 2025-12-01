@@ -44,6 +44,7 @@ export default function CommunityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const cursorRef = useRef<string | null>(null);
+  const [owner, setOwner] = useState<User | null>(null);
 
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
@@ -60,12 +61,21 @@ export default function CommunityScreen() {
 
   // Load members when People tab is active
   const loadMembers = useCallback(async () => {
-    if (!communityId) return;
     try {
       const data = await communityService.getCommunityMembers(communityId);
-      setMembers(data);
-    } catch (e) {
-      console.error('load members error', e);
+
+      const order: Record<'admin' | 'moderator' | 'member', number> = {
+        admin: 1,
+        moderator: 2,
+        member: 3,
+      };
+      const sorted = [...data].sort((a, b) => {
+        return order[a.role as keyof typeof order] - order[b.role as keyof typeof order];
+      });
+
+      setMembers(sorted);
+    } catch (error) {
+      console.error('Error loading members:', error);
     }
   }, [communityId]);
 
@@ -117,6 +127,15 @@ export default function CommunityScreen() {
 
         const c = await communityService.getCommunity(communityId, viewer);
         setCommunity(c);
+
+        if (c?.created_by) {
+          try {
+            const ownerData = await ApiService.getUserByUsername(c.created_by);
+            setOwner(ownerData);
+          } catch (e) {
+            console.warn("Failed to fetch owner info", e);
+          }
+        }
 
         const first = await communityService.getCommunityPosts(communityId, {
           limit: 10,
@@ -402,11 +421,21 @@ export default function CommunityScreen() {
             style={styles.ownerRow}
             onPress={() => router.push(`/account/profile?username=${community.created_by}`)}
           >
-            <View style={[styles.ownerAvatar, { backgroundColor: colors.primary }]}>
-              <Ionicons name="person" size={20} color="#fff" />
+            <View style={styles.ownerRow}>
+              {owner?.avatar ? (
+                <Image source={{ uri: owner.avatar }} style={styles.ownerAvatar} />
+              ) : (
+                <View style={[styles.ownerAvatar, { backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Ionicons name="person" size={20} color={colors.textMuted} />
+                </View>
+              )}
+
+              <Text style={[styles.ownerName, { color: colors.text }]}>
+                {owner?.name || community.created_by}
+              </Text>
+
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </View>
-            <Text style={[styles.ownerName, { color: colors.text }]}>{community.created_by}</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -435,7 +464,7 @@ export default function CommunityScreen() {
     const renderEventsContent = () => (
       <View style={[styles.tabContentContainer, { backgroundColor: colors.background, padding: 16 }]}>
         {/* Create Event Button - only for members */}
-        {community.is_member && (
+        {(myRole === 'admin' || myRole === 'moderator') && (
           <TouchableOpacity
             style={[styles.createEventButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push({

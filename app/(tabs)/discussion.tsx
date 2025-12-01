@@ -113,6 +113,14 @@ export default function DiscussionScreen() {
             </Text>
           )}
         </View>
+        <View style={styles.communityFooter}>
+          <View style={styles.memberCount}>
+            <Ionicons name="people-outline" size={16} color="#666" />
+            <Text style={styles.memberCountText}>
+              {item.member_count} members
+            </Text>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -120,7 +128,7 @@ export default function DiscussionScreen() {
   const currentCommunities = activeTab === 'my-communities' ? myCommunities : discoverCommunities;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <View
         style={[
           styles.header,
@@ -228,29 +236,8 @@ export default function DiscussionScreen() {
             onChangeText={setSearchQuery}
             placeholderTextColor={colors.textMuted}
           />
-        </View>
-
-        
+        </View>        
       )}
-      
-      {/* Create Community Button - chỉ hiển thị khi đang ở tab Discover
-      {activeTab === 'discover' && (
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            {
-              backgroundColor: isPro ? colors.primary : colors.border,
-              borderColor: isPro ? colors.primary : colors.border,
-            },
-          ]}
-          onPress={handleCreateCommunity}
-        >
-          <Ionicons name="add-circle-outline" size={20} color={isPro ? '#fff' : colors.textMuted} />
-          <Text style={[styles.createButtonText, { color: isPro ? '#fff' : colors.textMuted }]}>
-            {isPro ? 'Create Community' : 'Create Community (PRO)'}
-          </Text>
-        </TouchableOpacity>
-      )} */}
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
@@ -285,6 +272,8 @@ export default function DiscussionScreen() {
           }
         />
       )}
+
+      <View style={{ height: 5 }} />
     </SafeAreaView>
   );
 }
@@ -391,6 +380,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    marginTop: -16,
   },
   memberCount: {
     flexDirection: 'row',
@@ -399,6 +391,7 @@ const styles = StyleSheet.create({
   memberCountText: {
     fontSize: 14,
     marginLeft: 6,
+    color: '#666',
   },
   emptyContainer: {
     alignItems: 'center',
