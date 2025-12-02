@@ -43,25 +43,33 @@ export interface Language {
 
 // Event related types
 export interface Event {
-   id: string;
+   id: number;
    name: string;
-   image_url?: string;
-   dateStart: string;
-   dateEnd: string;
-   address: string;
-   distance?: number; // in km
-   participants: User[];
-   comments: Comment[];
+   description?: string | null;
+   details?: string | null;
+   image_url?: string | null;
    hosted_by: string;
-   entranceFee?: string;
-   pricingMenu?: string;
-   schedule?: string;
-   details?: string;
-   isWeekly?: boolean;
-   timeStart?: string;
-   timeEnd?: string;
-   description?: string;
-   category?: string;
+   address: string;
+   category: string;
+   latitude?: number | null;
+   longitude?: number | null;
+   date_start: string;
+   date_end: string;
+   entrance_fee?: string | null;
+   has_pricing_menu?: boolean;
+   is_recurring?: boolean;
+   recurrence_pattern?: string | null;
+   status?: "upcoming" | "ongoing" | "completed" | "cancelled";
+   participant_count?: number;
+   comment_count?: number;
+   comments?: {
+      id: number;
+      author_username: string;
+      content: string;
+      created_at: string;
+      image_url?: string | null;
+   }[];
+   distance?: number;
 }
 
 // Community Event types (Facebook-style events for communities)
@@ -131,16 +139,15 @@ export interface ImageFile {
 
 // Chat related types
 export interface Chat {
-  id: string;
-  type: 'event' | 'user' | 'group' | 'dm' | 'community';
-  name?: string;
-  participants?: User[];
-  lastMessage?: Message;
-  unreadCount?: number;
-  eventId?: string;
-  communityId?: number;
-  communityAvatar?: string;
-
+   id: string;
+   type: "event" | "user" | "group" | "dm" | "community";
+   name?: string;
+   participants?: User[];
+   lastMessage?: Message;
+   unreadCount?: number;
+   eventId?: string;
+   communityId?: number;
+   communityAvatar?: string;
 }
 
 export interface Message {
@@ -162,104 +169,105 @@ export interface QuickMessage {
 
 // Community/Discussion related types
 export interface Community {
-  id: number;
-  name: string;
-  description?: string | null;
-  bio?: string | null;
-  image_url?: string | null;
-  cover_image?: string | null;
+   id: number;
+   name: string;
+   description?: string | null;
+   bio?: string | null;
+   image_url?: string | null;
+   cover_image?: string | null;
 
-  created_by: string;
+   created_by: string;
 
-  member_count: number;
-  post_count: number;
-  is_private: boolean;
-  requires_post_approval?: boolean;
-  requires_member_approval?: boolean;
+   member_count: number;
+   post_count: number;
+   is_private: boolean;
+   requires_post_approval?: boolean;
+   requires_member_approval?: boolean;
 
-  chat_conversation_id?: number | null;
+   chat_conversation_id?: number | null;
 
-  created_at: string;
-  updated_at: string;
+   created_at: string;
+   updated_at: string;
 }
 
 export interface CommunityMember {
-  id: number;
-  community_id: number;
-  username: string;
-  role: 'admin' | 'moderator' | 'member';
-  joined_at: string;
-  user?: User;
+   id: number;
+   community_id: number;
+   username: string;
+   role: "admin" | "moderator" | "member";
+   joined_at: string;
+   user?: User;
 }
 
 export interface CommunityJoinRequest {
-  id: number;
-  community_id: number;
-  username: string;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewed_by?: string | null;
-  reviewed_at?: string | null;
-  created_at: string;
-  updated_at: string;
-  user?: User;
+   id: number;
+   community_id: number;
+   username: string;
+   status: "pending" | "approved" | "rejected";
+   reviewed_by?: string | null;
+   reviewed_at?: string | null;
+   created_at: string;
+   updated_at: string;
+   user?: User;
 }
 
 export interface PostMedia {
-  id: number;
-  post_id: number;
-  media_url: string;
-  media_type: "image" | "video";
-  position: number;
-  created_at: string;
+   id: number;
+   post_id: number;
+   media_url: string;
+   media_type: "image" | "video";
+   position: number;
+   created_at: string;
 }
 
 export interface Post {
-  id: number;
-  author_username: string;
-  content?: string | null;
-  status?: string | null;
-  audience: "public" | "followers" | "close_friends" | "private";
-  disable_comments: boolean;
-  hide_like_count: boolean;
-  like_count: number;
-  comment_count: number;
-  post_media: PostMedia[];
-  community_id?: number | null;
-  community_name?: string | null;
-  created_at: string;
-  updated_at?: string | null;
-  authorAvatar?: string;
-  authorDisplayName?: string;
+   id: number;
+   author_username: string;
+   content?: string | null;
+   status?: string | null;
+   audience: "public" | "followers" | "close_friends" | "private";
+   disable_comments: boolean;
+   hide_like_count: boolean;
+   like_count: number;
+   comment_count: number;
+   comments: string[];
+   post_media: PostMedia[];
+   community_id?: number | null;
+   community_name?: string | null;
+   created_at: string;
+   updated_at?: string | null;
+   authorAvatar?: string;
+   authorDisplayName?: string;
 }
 
 export interface Comment {
-  id: number;
-  post_id: number;
-  author_username: string;
-  content: string;
-  parent_id: number | null;
-  created_at: string;
-};
+   id: number;
+   post_id: number;
+   author_username: string;
+   content: string;
+   parent_id: number | null;
+   created_at: string;
+}
 
 export interface UserLite {
-  username: string;
-  avatar?: string | null;
-  name?: string | null;
+   username: string;
+   avatar?: string | null;
+   name?: string | null;
 }
 
 export interface CommentsSheetProps {
-  visible: boolean;
-  onClose: () => void;
-  communityId: number;
-  postId: number;
-  me?: UserLite | null;
+   visible: boolean;
+   onClose: () => void;
+   communityId: number;
+   postId: number;
+   me?: UserLite | null;
 }
 
 export interface LocalMediaFile {
-  id: number;
-  uri: string;
-  type: string;
-  name: string;
+   id: number;
+   uri: string;
+   type: string;
+   name: string;
 }
 
 // Notification related types
@@ -304,10 +312,10 @@ export interface LoginCredentials {
 }
 
 export interface SignupData extends LoginCredentials {
-  id: string;
-  username: string;
-  name: string;
-  country: string;
-  city: string;
-  gender?: 'Male' | 'Female' | 'Other';
+   id: string;
+   username: string;
+   name: string;
+   country: string;
+   city: string;
+   gender?: "Male" | "Female" | "Other";
 }
