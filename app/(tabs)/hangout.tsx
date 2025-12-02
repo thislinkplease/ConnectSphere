@@ -3,6 +3,7 @@ import { useTheme } from "@/src/context/ThemeContext";
 import ApiService from "@/src/services/api";
 import ImageService from "@/src/services/image";
 import { User } from "@/src/types";
+import { formatDistance } from "@/src/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -72,14 +73,31 @@ export default function HangoutScreen() {
       try {
          setLoading(true);
 
-         // Get users available for hangout
+         // Get current user location for distance calculation
+         let userLat: number | undefined;
+         let userLng: number | undefined;
+         
+         try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+               const loc = await Location.getCurrentPositionAsync({
+                  accuracy: Location.Accuracy.Balanced,
+               });
+               userLat = loc.coords.latitude;
+               userLng = loc.coords.longitude;
+            }
+         } catch (locationError) {
+            console.log("Could not get location for distance calculation:", locationError);
+            // Continue without location - users will be shown without distance sorting
+            // User can still see and interact with all available hangout users
+         }
+
+         // Get users available for hangout with location for distance calculation
          const hangoutData = await ApiService.getOpenHangouts({
             limit: 50,
+            user_lat: userLat,
+            user_lng: userLng,
          });
-
-         // Debug: Log first user to see structure
-         if (hangoutData.length > 0) {
-         }
 
          // Filter to only show online users and exclude current user
          // The server already filters for is_available and is_online
@@ -99,11 +117,7 @@ export default function HangoutScreen() {
             return true;
          });
 
-         // Debug: Log filtered users
-
-         if (onlineUsers.length > 0) {
-         }
-
+         // Server already sorts by distance, so no need to sort again
          setUsers(onlineUsers);
          setCurrentIndex(0);
          // Update refs for panResponder closure
@@ -427,6 +441,16 @@ export default function HangoutScreen() {
                            <Ionicons name="location-outline" size={16} color="#fff" />
                            <Text style={styles.locationText}>
                               {user.city}, {user.country}
+                           </Text>
+                        </View>
+                     )}
+
+                     {/* Distance indicator - Always show if available */}
+                     {user.distance !== undefined && user.distance !== null && (
+                        <View style={styles.distanceRow}>
+                           <Ionicons name="navigate-outline" size={18} color="#4ECDC4" />
+                           <Text style={styles.distanceText}>
+                              {formatDistance(user.distance)} away
                            </Text>
                         </View>
                      )}
@@ -766,6 +790,28 @@ const styles = StyleSheet.create({
       color: "#fff",
       fontSize: 16,
       marginLeft: 4,
+   },
+   distanceRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+      backgroundColor: "rgba(78, 205, 196, 0.25)",
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 16,
+      alignSelf: "flex-start",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+   },
+   distanceText: {
+      color: "#4ECDC4",
+      fontSize: 16,
+      fontWeight: "700",
+      marginLeft: 5,
+      letterSpacing: 0.5,
    },
    bioText: {
       color: "#fff",

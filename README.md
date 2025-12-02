@@ -43,8 +43,8 @@ Install Expo CLI:
 
 ## 3. Clone the Project
 ```bash
-git clone https://github.com/your-repo/connect-sphere.git
-cd connect-sphere/frontend
+git clone https://github.com/thislinkplease/ConnectSphere.git
+cd .\ConnectSphere\
 ```
 
 ---
@@ -108,4 +108,4 @@ Or open the QR code using the Expo Go app on your phone
 
 ## 8. Authors 
 
-- Develop by **Arcane Team**
+- Developed by **Arcane Team**

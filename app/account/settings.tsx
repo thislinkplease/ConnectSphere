@@ -81,25 +81,25 @@ export default function SettingsScreen() {
     danger?: boolean;
   }) => (
     <TouchableOpacity 
-      style={styles.settingRow}
+      style={[styles.settingRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
       onPress={onPress}
       disabled={!onPress}
     >
       <View style={styles.settingLeft}>
-        <Ionicons name={icon as any} size={24} color={danger ? '#FF3B30' : '#666'} />
-        <Text style={[styles.settingTitle, danger && styles.dangerText]}>{title}</Text>
+        <Ionicons name={icon as any} size={24} color={danger ? colors.error : colors.textSecondary} />
+        <Text style={[styles.settingTitle, { color: colors.text }, danger && [styles.dangerText, { color: colors.error }]]}>{title}</Text>
       </View>
       <View style={styles.settingRight}>
         {showSwitch && (
           <Switch
             value={value}
             onValueChange={onValueChange}
-            trackColor={{ false: '#e0e0e0', true: colors.primary }}
+            trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#fff"
           />
         )}
         {showChevron && (
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         )}
       </View>
     </TouchableOpacity>
@@ -116,7 +116,7 @@ export default function SettingsScreen() {
         <ScrollView>
           {/* Account Settings */}
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={styles.sectionTitle}>Account</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
             <SettingRow
               icon="person-outline"
               title="Edit Profile"
@@ -139,7 +139,7 @@ export default function SettingsScreen() {
 
           {/* Notification Settings */}
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={styles.sectionTitle}>Notifications</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Notifications</Text>
             <SettingRow
               icon="notifications-outline"
               title="Push Notifications"
@@ -179,7 +179,7 @@ export default function SettingsScreen() {
 
           {/* Privacy Settings */}
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={styles.sectionTitle}>Privacy</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Privacy</Text>
             <SettingRow
               icon="eye-outline"
               title="Profile Visibility"
@@ -205,7 +205,7 @@ export default function SettingsScreen() {
 
           {/* App Settings */}
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={styles.sectionTitle}>App Settings</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>App Settings</Text>
             <SettingRow
               icon="language-outline"
               title="Language"
@@ -228,7 +228,7 @@ export default function SettingsScreen() {
 
           {/* About */}
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>About</Text>
             <SettingRow
               icon="information-circle-outline"
               title="About ConnectSphere"
@@ -257,7 +257,7 @@ export default function SettingsScreen() {
 
           {/* Danger Zone */}
           <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={styles.sectionTitle}>Danger Zone</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Danger Zone</Text>
             <SettingRow
               icon="log-out-outline"
               title="Logout"
@@ -275,8 +275,8 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Flat Sphere v1.0.0</Text>
-            <Text style={styles.footerSubtext}>&hearts; Made by Arcane Team &hearts;</Text>
+            <Text style={[styles.footerText, { color: colors.textMuted }]}>Flat Sphere v1.0.0</Text>
+            <Text style={[styles.footerSubtext, { color: colors.textMuted }]}>&hearts; Made by Arcane Team &hearts;</Text>
           </View>
         </ScrollView>
       </SafeAreaView>

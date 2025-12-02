@@ -38,11 +38,30 @@ const toRad = (degrees: number): number => {
  * @param distance Distance in kilometers
  * @returns Formatted distance string
  */
-export const formatDistance = (distance: number): string => {
-  if (distance < 1) {
-    return `${Math.round(distance * 1000)}m`;
+export const formatDistance = (distance: number | null | undefined): string => {
+  // Handle null/undefined cases
+  if (distance === null || distance === undefined || isNaN(distance)) {
+    return 'Unknown';
   }
-  return `${distance}km`;
+  
+  // distance is already a number, no need for Number() conversion
+  if (distance < 0.001) {
+    return 'Nearby';
+  }
+  
+  if (distance < 1) {
+    // Display in meters for distances under 1km
+    const meters = Math.round(distance * 1000);
+    return `${meters}m`;
+  }
+  
+  if (distance < 10) {
+    // Display one decimal place for distances under 10km
+    return `${distance.toFixed(1)}km`;
+  }
+  
+  // Display whole numbers for distances over 10km
+  return `${Math.round(distance)}km`;
 };
 
 /**
