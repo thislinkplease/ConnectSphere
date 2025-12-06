@@ -465,34 +465,6 @@ export default function EditProfileScreen() {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Hangout Activities Section */}
-          <View style={[styles.section, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Hangout Activities</Text>
-            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Select activities you&apos;d like to do</Text>
-            <View style={styles.activitiesContainer}>
-              {HANGOUT_ACTIVITIES.map((activity) => (
-                <TouchableOpacity
-                  key={activity}
-                  style={[
-                    styles.activityButton,
-                    { borderColor: colors.border, backgroundColor: colors.surface },
-                    selectedActivities.includes(activity) && [styles.activityButtonActive, { borderColor: colors.primary, backgroundColor: colors.highlight }]
-                  ]}
-                  onPress={() => toggleActivity(activity)}
-                >
-                  <Text style={[
-                    styles.activityButtonText,
-                    { color: colors.text },
-                    selectedActivities.includes(activity) && [styles.activityButtonTextActive, { color: colors.primary }]
-                  ]}>
-                    {activity.replace(/-/g, ' ')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
           <View style={styles.footer} />
         </ScrollView>
       </SafeAreaView>

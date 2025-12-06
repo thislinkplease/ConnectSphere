@@ -70,9 +70,9 @@ The app will not run without valid API URLs and Supabase keys.
 
 ## 6. Run the App
 
-Start the Expo development server:
+Start the Expo:
 
-`npm start`
+`npx expo start`
 
 Then choose one of the following:
 

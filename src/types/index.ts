@@ -286,6 +286,8 @@ export interface HangoutFilters {
 export interface ConnectionFilters {
    gender?: "Male" | "Female";
    ageRange?: [number, number];
+   minAge?: number;
+   maxAge?: number;
    distance?: number;
 }
 

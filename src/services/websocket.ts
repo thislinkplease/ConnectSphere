@@ -226,6 +226,14 @@ class WebSocketService {
 
   // ==================== Community Chat Methods ====================
 
+  // Notify server that user joined a community (to ensure conversation exists)
+  notifyCommunityJoined(communityId: number, username: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('notify_community_conversation', { communityId, username });
+      console.log(`Notified server about joining community ${communityId}`);
+    }
+  }
+
   // Join community chat
   joinCommunityChat(communityId: number) {
     if (this.socket?.connected) {

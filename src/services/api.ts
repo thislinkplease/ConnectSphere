@@ -262,9 +262,22 @@ class ApiService {
       return mapServerUserToClient(data);
    }
 
-   async searchUsers(query: string): Promise<User[]> {
+   async searchUsers(query: string, filters?: ConnectionFilters): Promise<User[]> {
       // Cache search results for 30 seconds
-      const data: any[] = await this.deduplicatedGet("/users/search", { q: query }, 30000);
+      const params: any = { q: query };
+      
+      // Add filter parameters if provided
+      if (filters?.gender) {
+         params.gender = filters.gender;
+      }
+      if (filters?.minAge !== undefined) {
+         params.min_age = filters.minAge;
+      }
+      if (filters?.maxAge !== undefined) {
+         params.max_age = filters.maxAge;
+      }
+      
+      const data: any[] = await this.deduplicatedGet("/users/search", params, 30000);
       return (data || []).map(mapServerUserToClient);
    }
 
@@ -395,19 +408,19 @@ class ApiService {
    // Event endpoints
    async getEvents(filters?: any): Promise<Event[]> {
       // Cache events for 1 minute - events don't change frequently
-      const data = await this.deduplicatedGet("/events", filters, 60000);
+      const data = await this.deduplicatedGet<Event[]>("/events", filters, 60000);
       return data;
    }
 
    async getMyEvents(username: string, type: "participating" | "created" = "participating"): Promise<Event[]> {
       // Cache for 30 seconds
-      const data = await this.deduplicatedGet(`/events/user/${username}/${type}`, {}, 30000);
+      const data = await this.deduplicatedGet<Event[]>(`/events/user/${username}/${type}`, {}, 30000);
       return data;
    }
 
    async getEventById(eventId: string, viewer?: string): Promise<Event> {
       // Cache event details for 1 minute
-      const data = await this.deduplicatedGet(`/events/${eventId}`, { viewer }, 60000);
+      const data = await this.deduplicatedGet<Event>(`/events/${eventId}`, { viewer }, 60000);
       return data;
    }
 

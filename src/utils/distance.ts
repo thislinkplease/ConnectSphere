@@ -1,5 +1,7 @@
 /**
  * Calculate distance between two coordinates using Haversine formula
+ * This calculates the great-circle distance (đường chim bay / as the crow flies)
+ * Uses WGS84 ellipsoid radius for improved accuracy
  * @param lat1 Latitude of first point
  * @param lon1 Longitude of first point
  * @param lat2 Latitude of second point
@@ -12,21 +14,29 @@ export const calculateDistance = (
   lat2: number,
   lon2: number
 ): number => {
-  const R = 6371; // Radius of the Earth in km
+  // WGS84 Earth radius in km (more accurate than simple 6371)
+  // This is the mean radius used by GPS systems
+  const R = 6371.0088;
+  
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   
+  const lat1Rad = toRad(lat1);
+  const lat2Rad = toRad(lat2);
+  
+  // Haversine formula for great-circle distance
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
+    Math.cos(lat1Rad) *
+      Math.cos(lat2Rad) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
   
-  return Math.round(distance * 10) / 10; // Round to 1 decimal place
+  // Return with high precision, rounding will be done in formatDistance
+  return distance;
 };
 
 const toRad = (degrees: number): number => {
@@ -34,9 +44,9 @@ const toRad = (degrees: number): number => {
 };
 
 /**
- * Format distance for display
+ * Format distance for display with high precision
  * @param distance Distance in kilometers
- * @returns Formatted distance string
+ * @returns Formatted distance string (e.g., "50m", "1.2km", "15km")
  */
 export const formatDistance = (distance: number | null | undefined): string => {
   // Handle null/undefined cases
@@ -44,23 +54,29 @@ export const formatDistance = (distance: number | null | undefined): string => {
     return 'Unknown';
   }
   
-  // distance is already a number, no need for Number() conversion
-  if (distance < 0.001) {
+  // Very close (less than 10 meters)
+  const TEN_METERS_IN_KM = 0.01;
+  if (distance < TEN_METERS_IN_KM) {
     return 'Nearby';
   }
   
+  // Under 1km - show in meters
   if (distance < 1) {
-    // Display in meters for distances under 1km
     const meters = Math.round(distance * 1000);
     return `${meters}m`;
   }
   
+  // 1-10km - show one decimal place for precision
   if (distance < 10) {
-    // Display one decimal place for distances under 10km
     return `${distance.toFixed(1)}km`;
   }
   
-  // Display whole numbers for distances over 10km
+  // 10-100km - show one decimal place
+  if (distance < 100) {
+    return `${distance.toFixed(1)}km`;
+  }
+  
+  // Over 100km - show whole numbers
   return `${Math.round(distance)}km`;
 };
 
