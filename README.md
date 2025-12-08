@@ -43,8 +43,8 @@ Install Expo CLI:
 
 ## 3. Clone the Project
 ```bash
-git clone https://github.com/your-repo/connect-sphere.git
-cd connect-sphere/frontend
+git clone https://github.com/thislinkplease/ConnectSphere.git
+cd .\ConnectSphere\
 ```
 
 ---
@@ -70,9 +70,9 @@ The app will not run without valid API URLs and Supabase keys.
 
 ## 6. Run the App
 
-Start the Expo development server:
+Start the Expo:
 
-`npm start`
+`npx expo start`
 
 Then choose one of the following:
 
@@ -108,4 +108,4 @@ Or open the QR code using the Expo Go app on your phone
 
 ## 8. Authors 
 
-- Develop by **Arcane Team**
+- Developed by **Arcane Team**

@@ -198,8 +198,10 @@ export default function ChatScreen() {
     const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
     if (!WebSocketService.isConnected()) {
-      const token = currentUser.username;
-      WebSocketService.connect(apiUrl, token);
+      // Get token from useAuth hook - need to add this import above
+      // For now, use username as fallback (WebSocket server accepts username as token)
+      const authToken = currentUser.username;
+      WebSocketService.connect(apiUrl, authToken);
       setTimeout(() => {
         if (WebSocketService.isConnected()) {
           WebSocketService.joinConversation(chatId);

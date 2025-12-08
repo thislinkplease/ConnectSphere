@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { formatDistance as formatDistanceUtil } from '../utils/distance';
 
 class LocationService {
   private currentLocation: Location.LocationObject | null = null;
@@ -25,7 +26,7 @@ class LocationService {
     }
   }
 
-  // Get current location
+  // Get current location with high accuracy
   async getCurrentLocation(): Promise<Location.LocationObject | null> {
     try {
       const hasPermission = await this.hasPermissions();
@@ -36,15 +37,27 @@ class LocationService {
         }
       }
 
+      // Use High accuracy for precise distance calculations
+      // This uses GPS which is more accurate than cell tower/wifi triangulation
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
 
       this.currentLocation = location;
       return location;
     } catch (error) {
       console.error('Error getting current location:', error);
-      return null;
+      // Fallback to balanced accuracy if high accuracy fails
+      try {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        this.currentLocation = location;
+        return location;
+      } catch (fallbackError) {
+        console.error('Error getting location with fallback:', fallbackError);
+        return null;
+      }
     }
   }
 
@@ -54,19 +67,25 @@ class LocationService {
   }
 
   // Calculate distance between two coordinates (Haversine formula)
+  // This calculates great-circle distance (đường chim bay / as the crow flies)
   calculateDistance(
     lat1: number,
     lon1: number,
     lat2: number,
     lon2: number
   ): number {
-    const R = 6371; // Radius of the Earth in km
+    // WGS84 Earth radius in km - more accurate than simple 6371
+    const R = 6371.0088;
     const dLat = this.toRad(lat2 - lat1);
     const dLon = this.toRad(lon2 - lon1);
+    
+    const lat1Rad = this.toRad(lat1);
+    const lat2Rad = this.toRad(lat2);
+    
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) *
-        Math.cos(this.toRad(lat2)) *
+      Math.cos(lat1Rad) *
+        Math.cos(lat2Rad) *
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
@@ -79,15 +98,9 @@ class LocationService {
     return degrees * (Math.PI / 180);
   }
 
-  // Format distance for display
-  formatDistance(distance: number): string {
-    if (distance < 1) {
-      return `${Math.round(distance * 1000)}m`;
-    } else if (distance < 10) {
-      return `${distance.toFixed(1)}km`;
-    } else {
-      return `${Math.round(distance)}km`;
-    }
+  // Format distance for display - delegates to utility function to avoid duplication
+  formatDistance(distance: number | null | undefined): string {
+    return formatDistanceUtil(distance);
   }
 
   // Get distance to user

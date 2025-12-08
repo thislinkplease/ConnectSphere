@@ -21,6 +21,7 @@ import PostItem from '@/components/posts/post_item';
 import CommentsSheet from '@/components/posts/comments_sheet';
 import { useTheme } from '@/src/context/ThemeContext';
 import { postService } from '@/src/services/postService';
+import WebSocketService from '@/src/services/websocket';
 
 type TabType = 'Discussion' | 'People' | 'Events' | 'Details';
 
@@ -222,6 +223,11 @@ export default function CommunityScreen() {
         );
       } else {
         setCommunity((prev) => prev ? { ...prev, is_member: true, membership_status: 'approved', member_count: (prev.member_count ?? 0) + 1 } : prev);
+        
+        // IMPROVED: Notify WebSocket server about community join to ensure conversation is ready
+        if (WebSocketService.isConnected()) {
+          WebSocketService.notifyCommunityJoined(communityId, me.username);
+        }
       }
     } catch (e: any) {
       if (e.message === 'REQUIRES_REQUEST') {

@@ -34,6 +34,7 @@ export interface User {
       longitude: number;
    };
    isOnline?: boolean;
+   distance?: number; // Distance in kilometers from current user
 }
 
 export interface Language {
@@ -45,31 +46,50 @@ export interface Language {
 export interface Event {
    id: number;
    name: string;
-   description?: string | null;
-   details?: string | null;
-   image_url?: string | null;
-   hosted_by: string;
+   // description?: string | null;
+   // details?: string | null;
+   // image_url?: string | null;
+   // hosted_by: string;
+   // address: string;
+   // category: string;
+   // latitude?: number | null;
+   // longitude?: number | null;
+   // date_start: string;
+   // date_end: string;
+   // entrance_fee?: string | null;
+   // has_pricing_menu?: boolean;
+   // is_recurring?: boolean;
+   // recurrence_pattern?: string | null;
+   // status?: "upcoming" | "ongoing" | "completed" | "cancelled";
+   // participant_count?: number;
+   // comment_count?: number;
+   // comments?: {
+   //    id: number;
+   //    author_username: string;
+   //    content: string;
+   //    created_at: string;
+   //    image_url?: string | null;
+   // }[];
+   // distance?: number;
+   image_url?: string;
+   image?: string; // For backward compatibility with mock data
+   dateStart: string;
+   dateEnd: string;
    address: string;
-   category: string;
-   latitude?: number | null;
-   longitude?: number | null;
-   date_start: string;
-   date_end: string;
-   entrance_fee?: string | null;
-   has_pricing_menu?: boolean;
-   is_recurring?: boolean;
-   recurrence_pattern?: string | null;
-   status?: "upcoming" | "ongoing" | "completed" | "cancelled";
-   participant_count?: number;
-   comment_count?: number;
-   comments?: {
-      id: number;
-      author_username: string;
-      content: string;
-      created_at: string;
-      image_url?: string | null;
-   }[];
-   distance?: number;
+   distance?: number; // in km
+   participants: User[];
+   comments: Comment[];
+   hosted_by?: string;
+   hostedBy?: User; // For backward compatibility with mock data
+   entranceFee?: string;
+   pricingMenu?: string;
+   schedule?: string;
+   details?: string;
+   isWeekly?: boolean;
+   timeStart?: string;
+   timeEnd?: string;
+   description?: string;
+   category?: string;
 }
 
 // Community Event types (Facebook-style events for communities)
@@ -291,6 +311,8 @@ export interface HangoutFilters {
 export interface ConnectionFilters {
    gender?: "Male" | "Female";
    ageRange?: [number, number];
+   minAge?: number;
+   maxAge?: number;
    distance?: number;
 }
 

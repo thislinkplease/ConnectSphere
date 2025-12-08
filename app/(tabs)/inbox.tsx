@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,22 +10,58 @@ import { useTheme } from '@/src/context/ThemeContext';
 import ApiService from '@/src/services/api';
 import WebSocketService from '@/src/services/websocket';
 
+// Delay before refreshing conversation list after WebSocket event (ms)
+const CONVERSATION_REFRESH_DELAY = 500;
+
+// Time to keep processed messages in memory (5 minutes)
+const MESSAGE_CACHE_DURATION = 5 * 60 * 1000;
+
 export default function InboxScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { colors } = useTheme();
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'communities' | 'users'>('all');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Track processed messages to prevent duplicate counting
+  const processedMessagesRef = useRef<Map<string, number>>(new Map());
 
-  // 1) Đảm bảo WebSocket kết nối khi ở Inbox
+  // Cleanup old processed messages periodically
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      const messagesToRemove: string[] = [];
+      
+      processedMessagesRef.current.forEach((timestamp, messageId) => {
+        if (now - timestamp > MESSAGE_CACHE_DURATION) {
+          messagesToRemove.push(messageId);
+        }
+      });
+      
+      messagesToRemove.forEach(messageId => {
+        processedMessagesRef.current.delete(messageId);
+      });
+      
+      if (messagesToRemove.length > 0) {
+        console.log(`🧹 Cleaned up ${messagesToRemove.length} old processed messages`);
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
+  // 1) Đảm bảo WebSocket kết nối khi ở Inbox và setup token properly
   useEffect(() => {
     if (!user?.username) return;
     const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
     if (!WebSocketService.isConnected()) {
-      WebSocketService.connect(apiUrl, user.username);
+      // Use token from AuthContext if available, otherwise fallback to username
+      const authToken = token || user.username;
+      WebSocketService.connect(apiUrl, authToken);
     }
-  }, [user?.username]);
+  }, [user?.username, token]);
 
   // 2) Load chats và JOIN tất cả room để nhận realtime
   const loadChats = useCallback(async () => {
@@ -37,7 +73,7 @@ export default function InboxScreen() {
 
       // Join tất cả conversation rooms (quan trọng để Inbox realtime)
       data.forEach(c => {
-        if (c?.id != null) {
+        if (c?.id) {
           WebSocketService.joinConversation(String(c.id));
         }
         // Also join community chat rooms for community conversations
@@ -52,6 +88,30 @@ export default function InboxScreen() {
     }
   }, [user?.username]);
 
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    if (!user?.username) return;
+    try {
+      setRefreshing(true);
+      const data = await ApiService.getConversations(user.username);
+      setChats(data);
+
+      // Re-join all conversation rooms
+      data.forEach(c => {
+        if (c?.id) {
+          WebSocketService.joinConversation(String(c.id));
+        }
+        if (c?.type === 'community' && c?.communityId) {
+          WebSocketService.joinCommunityChat(c.communityId);
+        }
+      });
+    } catch (error) {
+      console.error('Error refreshing chats:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user?.username]);
+
   useEffect(() => {
     loadChats();
   }, [loadChats]);
@@ -63,12 +123,45 @@ export default function InboxScreen() {
   useEffect(() => {
     if (!user?.username) return;
 
+    // IMPROVED: Handle when a new community conversation is ready
+    const handleCommunityConversationReady = (data: { communityId: number; conversationId: string }) => {
+      console.log(`✅ Community conversation ready for community ${data.communityId}, conversation ${data.conversationId}`);
+      
+      // Join the community chat WebSocket room immediately
+      WebSocketService.joinCommunityChat(data.communityId);
+      WebSocketService.joinConversation(String(data.conversationId));
+      
+      // Reload conversations to get the new one in the list
+      setTimeout(() => {
+        loadChats();
+      }, CONVERSATION_REFRESH_DELAY);
+    };
+
     // Handle new messages to update conversation list
     const handleNewMessage = (message: any) => {
-      
-      
       const conversationId = String(message.chatId || message.conversation_id || message.conversationId);
       const senderId = message.senderId || message.sender_username || message.sender?.username;
+      const messageId = message.id || message.message_id;
+      
+      // CRITICAL: Check for duplicate messages to prevent double counting
+      if (messageId) {
+        const messageKey = `${conversationId}-${messageId}`;
+        if (processedMessagesRef.current.has(messageKey)) {
+          console.log('⚠️ Duplicate message detected, skipping:', messageKey);
+          return;
+        }
+        // Mark as processed
+        processedMessagesRef.current.set(messageKey, Date.now());
+      }
+      
+      // CRITICAL: Always use server timestamp
+      const messageTimestamp = message.timestamp || message.created_at;
+      
+      // Exit early if no valid timestamp - prevents corrupting the list order
+      if (!messageTimestamp) {
+        console.warn('⚠️ Received message without timestamp, skipping update:', message);
+        return;
+      }
       
       setChats(prevChats => {
         // Find existing conversation
@@ -160,20 +253,19 @@ export default function InboxScreen() {
             }
           }
           
-          // Create updated chat object and move to top
-          // CRITICAL: Always use server timestamp, never generate current time
-          const messageTimestamp = message.timestamp || message.created_at;
+          // Create updated chat object with guaranteed message ID
+          const messageId = message.id ? String(message.id) : `temp_${Date.now()}_${Math.random()}`;
           
           const updatedChat = {
             ...existingChat,
             participants: updatedParticipants,
             lastMessage: {
-              id: String(message.id || Date.now()),
+              id: messageId,
               chatId: conversationId,
               senderId: senderId || 'unknown',
               sender: senderInfo,
               content: message.content || '',
-              timestamp: messageTimestamp || '',
+              timestamp: messageTimestamp,
               read: false,
             },
             // Increment unread count if message is from someone else
@@ -187,15 +279,13 @@ export default function InboxScreen() {
           updatedChats.unshift(updatedChat);
           
           return updatedChats;
-                } else {
-          // New conversation first message (we got it because server emitted directly to our socket)
-         
-
-          // Tạo minimal sender
+        } else {
+          // New conversation first message
+          // Build minimal sender info
           const minimalSender = message.sender || {
             id: senderId || 'unknown',
             username: senderId || 'unknown',
-            name: senderId || senderId || 'Unknown User',
+            name: senderId || 'Unknown User',
             email: `${senderId || 'unknown'}@example.com`,
             avatar: '',
             country: '',
@@ -205,8 +295,7 @@ export default function InboxScreen() {
             interests: [],
           };
 
-          // CRITICAL: Always use server timestamp
-          const messageTimestamp = message.timestamp || message.created_at;
+          const messageId = message.id ? String(message.id) : `temp_${Date.now()}_${Math.random()}`;
 
           const minimalChat: Chat = {
             id: conversationId,
@@ -214,27 +303,27 @@ export default function InboxScreen() {
             name: minimalSender.name || minimalSender.username,
             participants: [minimalSender],
             lastMessage: {
-              id: String(message.id || Date.now()),
+              id: messageId,
               chatId: conversationId,
               senderId: senderId || 'unknown',
               sender: minimalSender,
               content: message.content || '',
-              timestamp: messageTimestamp || '',
+              timestamp: messageTimestamp,
               read: false,
             },
             unreadCount: senderId !== user.username ? 1 : 0,
           };
 
-          // Join room ngay (sẽ không lỗi nếu đã join)
+          // Join room immediately
           WebSocketService.joinConversation(conversationId);
 
-          // Thêm vào đầu danh sách
+          // Add to top of list
           const newList = [minimalChat, ...prevChats];
 
-          // Gọi loadChats nền để enrich (avatar, participants đầy đủ)
+          // Enrich conversation data in background (debounced to avoid multiple calls)
           setTimeout(() => {
             loadChats();
-          }, 300);
+          }, CONVERSATION_REFRESH_DELAY * 2); // Use 2x delay for debouncing
 
           return newList;
         }
@@ -247,6 +336,27 @@ export default function InboxScreen() {
       if (!communityId) return;
 
       const senderId = message.sender_username || message.senderId || message.sender?.username;
+      const messageId = message.id || message.message_id;
+      
+      // CRITICAL: Check for duplicate messages to prevent double counting
+      if (messageId) {
+        const messageKey = `community-${communityId}-${messageId}`;
+        if (processedMessagesRef.current.has(messageKey)) {
+          console.log('⚠️ Duplicate community message detected, skipping:', messageKey);
+          return;
+        }
+        // Mark as processed
+        processedMessagesRef.current.set(messageKey, Date.now());
+      }
+      
+      // CRITICAL: Always use server timestamp
+      const messageTimestamp = message.timestamp || message.created_at;
+      
+      // Exit early if no valid timestamp - prevents corrupting the list order
+      if (!messageTimestamp) {
+        console.warn('⚠️ Received community message without timestamp, skipping update:', message);
+        return;
+      }
       
       setChats(prevChats => {
         // Find the community conversation
@@ -273,18 +383,17 @@ export default function InboxScreen() {
             interests: [],
           };
           
-          // CRITICAL: Always use server timestamp
-          const messageTimestamp = message.timestamp || message.created_at;
+          const messageId = message.id ? String(message.id) : `temp_${Date.now()}_${Math.random()}`;
           
           const updatedChat = {
             ...existingChat,
             lastMessage: {
-              id: String(message.id || Date.now()),
+              id: messageId,
               chatId: String(existingChat.id),
               senderId: senderId || 'unknown',
               sender: senderInfo,
               content: message.content || '',
-              timestamp: messageTimestamp || '',
+              timestamp: messageTimestamp,
               read: false,
             },
             // Increment unread count if message is from someone else
@@ -299,10 +408,10 @@ export default function InboxScreen() {
           
           return updatedChats;
         } else {
-          // New community conversation - reload to get proper data
+          // New community conversation - reload to get proper data (debounced)
           setTimeout(() => {
             loadChats();
-          }, 300);
+          }, CONVERSATION_REFRESH_DELAY * 2); // Use 2x delay for debouncing
           return prevChats;
         }
       });
@@ -313,11 +422,15 @@ export default function InboxScreen() {
     
     // Listen to new community messages
     WebSocketService.onNewCommunityMessage(handleNewCommunityMessage);
+    
+    // Listen for community conversation ready events
+    WebSocketService.on('community_conversation_ready', handleCommunityConversationReady);
 
     return () => {
       // Clean up listeners
       WebSocketService.off('new_message', handleNewMessage);
       WebSocketService.off('new_community_message', handleNewCommunityMessage);
+      WebSocketService.off('community_conversation_ready', handleCommunityConversationReady);
     };
   }, [user?.username, user, loadChats]);
 
@@ -383,7 +496,7 @@ export default function InboxScreen() {
         setTimeout(() => {
           console.log('Reloading chats due to missing user data');
           loadChats();
-        }, 500);
+        }, CONVERSATION_REFRESH_DELAY);
       }
     } else {
       displayName = item.name || 'Group Chat';
@@ -499,6 +612,14 @@ export default function InboxScreen() {
           data={filteredChats}
           renderItem={renderChatItem}
           keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />

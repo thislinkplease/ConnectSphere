@@ -13,6 +13,8 @@ import {
    SignupData,
    User,
 } from "../types";
+import CacheService from "./cache";
+
 // Base API configuration
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://api.example.com";
 
@@ -111,11 +113,19 @@ class ApiService {
       delete this.client.defaults.headers.common["Authorization"];
    }
 
-   // Helper method to deduplicate GET requests
-   public async deduplicatedGet<T>(url: string, params?: any): Promise<T> {
+   // Helper method to deduplicate GET requests with optional caching
+   public async deduplicatedGet<T>(url: string, params?: any, cacheTTL?: number): Promise<T> {
       // Only deduplicate GET requests (safe for read operations)
       const cacheKey = `GET:${url}:${JSON.stringify(params || {})}`;
       const now = Date.now();
+
+      // Check cache first if TTL is provided
+      if (cacheTTL) {
+         const cached = CacheService.get<T>(cacheKey);
+         if (cached) {
+            return cached;
+         }
+      }
 
       // Check if there's a pending request for the same endpoint
       const pending = pendingRequests.get(cacheKey);
@@ -129,6 +139,12 @@ class ApiService {
          .then((response) => {
             // Clean up from pending requests after completion
             pendingRequests.delete(cacheKey);
+            
+            // Store in cache if TTL is provided
+            if (cacheTTL) {
+               CacheService.set(cacheKey, response.data, cacheTTL);
+            }
+            
             return response.data;
          })
          .catch((error) => {
@@ -141,6 +157,11 @@ class ApiService {
       pendingRequests.set(cacheKey, { promise, timestamp: now });
 
       return promise;
+   }
+
+   // Method to invalidate cache for specific patterns
+   public invalidateCache(pattern: string) {
+      CacheService.invalidatePattern(pattern);
    }
 
    // Auth endpoints
@@ -176,12 +197,16 @@ class ApiService {
    }
 
    async getUserByUsername(username: string): Promise<User> {
-      const data = await this.deduplicatedGet(`/users/username/${username}`);
+      // Cache user profiles for 2 minutes
+      const data = await this.deduplicatedGet(`/users/username/${username}`, {}, 120000);
       return mapServerUserToClient(data);
    }
 
    async updateUser(userId: string, data: Partial<User>): Promise<User> {
       const response = await this.client.put(`/users/${userId}`, data);
+      // Invalidate user cache after update with specific patterns
+      this.invalidateCache(`/users/${userId}`);
+      this.invalidateCache(`/users/username/`);
       return mapServerUserToClient(response.data);
    }
 
@@ -191,6 +216,9 @@ class ApiService {
       const response = await this.client.post(`/users/${userId}/avatar`, formData, {
          headers: { "Content-Type": "multipart/form-data" },
       });
+      // Invalidate user cache after avatar upload
+      this.invalidateCache(`/users/${userId}`);
+      this.invalidateCache(`/users/username/`);
       return response.data;
    }
 
@@ -200,6 +228,9 @@ class ApiService {
       const response = await this.client.post(`/users/${userId}/background-image`, formData, {
          headers: { "Content-Type": "multipart/form-data" },
       });
+      // Invalidate user cache after background upload
+      this.invalidateCache(`/users/${userId}`);
+      this.invalidateCache(`/users/username/`);
       return response.data;
    }
 
@@ -221,17 +252,33 @@ class ApiService {
    }
 
    async getUsers(filters?: ConnectionFilters): Promise<User[]> {
-      const data: any[] = await this.deduplicatedGet("/users", filters);
+      // Cache for 1 minute to reduce API calls
+      const data: any[] = await this.deduplicatedGet("/users", filters, 60000);
       return (data || []).map(mapServerUserToClient);
    }
 
    async getUserById(userId: string): Promise<User> {
-      const data = await this.deduplicatedGet(`/users/${userId}`);
+      // Cache for 2 minutes - user data doesn't change frequently
+      const data = await this.deduplicatedGet(`/users/${userId}`, {}, 120000);
       return mapServerUserToClient(data);
    }
 
-   async searchUsers(query: string): Promise<User[]> {
-      const data: any[] = await this.deduplicatedGet("/users/search", { q: query });
+   async searchUsers(query: string, filters?: ConnectionFilters): Promise<User[]> {
+      // Cache search results for 30 seconds
+      const params: any = { q: query };
+      
+      // Add filter parameters if provided
+      if (filters?.gender) {
+         params.gender = filters.gender;
+      }
+      if (filters?.minAge !== undefined) {
+         params.min_age = filters.minAge;
+      }
+      if (filters?.maxAge !== undefined) {
+         params.max_age = filters.maxAge;
+      }
+      
+      const data: any[] = await this.deduplicatedGet("/users/search", params, 30000);
       return (data || []).map(mapServerUserToClient);
    }
 
@@ -373,21 +420,15 @@ class ApiService {
    }
 
    async getEvents(filters?: any): Promise<Event[]> {
-      const response = await this.client.get("/events", { params: filters });
-
-      return response.data.map((e: any) => ({
-         ...e,
-         dateStart: e.date_start,
-         dateEnd: e.date_end,
-         entranceFee: e.entrance_fee,
-         image_url: e.image_url,
-         address: e.address ?? e.location,
-      }));
+      // Cache events for 1 minute - events don't change frequently
+      const data = await this.deduplicatedGet<Event[]>("/events", filters, 60000);
+      return data;
    }
 
    async getMyEvents(username: string, type: "participating" | "created" = "participating"): Promise<Event[]> {
-      const response = await this.client.get(`/events/user/${username}/${type}`);
-      return response.data;
+      // Cache for 30 seconds
+      const data = await this.deduplicatedGet<Event[]>(`/events/user/${username}/${type}`, {}, 30000);
+      return data;
    }
 
    async uploadEventImage(file: any): Promise<string> {
@@ -424,12 +465,9 @@ class ApiService {
    }
 
    async getEventById(eventId: string, viewer?: string): Promise<Event> {
-      const response = await this.client.get(`/events/${eventId}`, { params: { viewer } });
-      return {
-         ...response.data,
-         date_start: fromUTCString(response.data.date_start),
-         date_end: fromUTCString(response.data.date_end),
-      };
+      // Cache event details for 1 minute
+      const data = await this.deduplicatedGet<Event>(`/events/${eventId}`, { viewer }, 60000);
+      return data;
    }
 
    async joinEvent(eventId: string, username: string, status: "going" | "interested" = "going"): Promise<void> {
@@ -467,13 +505,14 @@ class ApiService {
       user_lng?: number;
       limit?: number;
    }): Promise<User[]> {
+      // Cache for 30 seconds to reduce frequent API calls
       const users = await this.deduplicatedGet(`/hangouts`, {
          languages: params?.languages?.join(","),
          distance_km: params?.distance_km,
          user_lat: params?.user_lat,
          user_lng: params?.user_lng,
          limit: params?.limit,
-      });
+      }, 30000); // 30 second cache
 
       // Map server user data to client format, ensuring we have an array
       if (!users || !Array.isArray(users)) {
@@ -481,16 +520,7 @@ class ApiService {
          return [];
       }
 
-      // Debug: Log raw server response
-
-      if (users.length > 0) {
-      }
-
       const mappedUsers = users.map((user: any) => mapServerUserToClient(user));
-
-      // Debug: Log mapped response
-      if (mappedUsers.length > 0) {
-      }
 
       return mappedUsers;
    }
@@ -505,7 +535,8 @@ class ApiService {
       current_activity?: string;
       activities?: string[];
    }> {
-      return this.deduplicatedGet(`/hangouts/status/${encodeURIComponent(username)}`);
+      // Cache for 15 seconds - status changes are infrequent
+      return this.deduplicatedGet(`/hangouts/status/${encodeURIComponent(username)}`, {}, 15000);
    }
 
    async createHangout(data: any): Promise<any> {
@@ -519,7 +550,8 @@ class ApiService {
 
    // Chat endpoints
    async getConversations(username: string): Promise<Chat[]> {
-      const raw: any = await this.deduplicatedGet("/messages/conversations", { user: username });
+      // Cache conversations for 15 seconds - will be updated by WebSocket
+      const raw: any = await this.deduplicatedGet("/messages/conversations", { user: username }, 15000);
 
       return (raw || []).map((c: any) => {
          // Map participants from server response
@@ -988,9 +1020,9 @@ class ApiService {
       });
    }
 
-   // Get all users location
+   // Get all users location - cache for 30 seconds since map updates are now manual
    async getVisibleUsersLocation(): Promise<User[]> {
-      const data: any[] = await this.deduplicatedGet(`/hangouts/locations`);
+      const data: any[] = await this.deduplicatedGet(`/hangouts/locations`, {}, 30000);
       return (data || []).map((u) => mapServerUserToClient(u));
    }
 

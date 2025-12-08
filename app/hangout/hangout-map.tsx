@@ -2,6 +2,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useTheme } from "@/src/context/ThemeContext";
 import ApiService from "@/src/services/api";
 import { User } from "@/src/types";
+import { calculateDistance, formatDistance } from "@/src/utils/distance";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
@@ -16,28 +17,35 @@ export default function HangoutMapScreen() {
 
    const [users, setUsers] = useState<User[]>([]);
    const [loading, setLoading] = useState(true);
+   const [refreshing, setRefreshing] = useState(false);
    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
    const mapRef = useRef<MapView>(null);
 
    // ---- Load visible users with locations ----
-   const loadLocations = async () => {
+   const loadLocations = async (showRefreshing = false) => {
       try {
+         if (showRefreshing) setRefreshing(true);
          const data = await ApiService.getVisibleUsersLocation();
          setUsers(data || []);
+         setLastUpdated(new Date());
       } catch (err) {
          console.log("map error:", err);
       } finally {
          setLoading(false);
+         if (showRefreshing) setRefreshing(false);
       }
    };
 
-   // First load + realtime polling
+   // First load + realtime polling (increased to 60s to reduce API calls)
    useEffect(() => {
       loadLocations();
 
+      // Reduced polling frequency from 5s to 60s to optimize API usage
+      // Users can manually refresh if needed with the refresh button
       const interval = setInterval(() => {
          loadLocations();
-      }, 5000); // 5s 1 lần
+      }, 60000); // 60s (1 minute) to significantly reduce API calls
 
       return () => clearInterval(interval);
    }, []);
@@ -50,25 +58,42 @@ export default function HangoutMapScreen() {
       return null;
    }, [users, currentUser]);
 
-   // Helper: Haversine distance in km
+   // Sort users by distance (closest first)
+   const sortedUsers = useMemo(() => {
+      if (!myLocation) return users;
+
+      return [...users]
+         .map((user) => {
+            if (!user.location) return { ...user, distance: undefined };
+            
+            const distance = calculateDistance(
+               myLocation.latitude,
+               myLocation.longitude,
+               user.location.latitude,
+               user.location.longitude
+            );
+            
+            return { ...user, distance };
+         })
+         .sort((a, b) => {
+            // Put users without location at the end
+            if (a.distance === undefined) return 1;
+            if (b.distance === undefined) return -1;
+            // Sort by distance ascending (closest first)
+            return a.distance - b.distance;
+         });
+   }, [users, myLocation]);
+
+   // Calculate distance for selected user
    const distanceKm = useMemo(() => {
       if (!myLocation || !selectedUser?.location) return null;
-
-      const toRad = (deg: number) => (deg * Math.PI) / 180;
-      const R = 6371; // Earth radius in km
-
-      const dLat = toRad(selectedUser.location.latitude - myLocation.latitude);
-      const dLon = toRad(selectedUser.location.longitude - myLocation.longitude);
-
-      const a =
-         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-         Math.cos(toRad(myLocation.latitude)) *
-            Math.cos(toRad(selectedUser.location.latitude)) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
-
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
+      
+      return calculateDistance(
+         myLocation.latitude,
+         myLocation.longitude,
+         selectedUser.location.latitude,
+         selectedUser.location.longitude
+      );
    }, [myLocation, selectedUser]);
 
    const centerOnMe = () => {
@@ -135,7 +160,7 @@ export default function HangoutMapScreen() {
                longitudeDelta: 0.05,
             }}
          >
-            {users.map((u) =>
+            {sortedUsers.map((u) =>
                u.location ? (
                   <Marker
                      key={u.username || String(u.id)}
@@ -157,6 +182,28 @@ export default function HangoutMapScreen() {
                ) : null
             )}
          </MapView>
+
+         {/* Refresh button */}
+         <TouchableOpacity 
+            style={[styles.refreshButton, { backgroundColor: colors.card, borderColor: colors.border }]} 
+            onPress={() => loadLocations(true)}
+            disabled={refreshing}
+         >
+            {refreshing ? (
+               <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+               <Ionicons name="refresh" size={22} color={colors.primary} />
+            )}
+         </TouchableOpacity>
+
+         {/* Last updated time */}
+         {lastUpdated && !loading && (
+            <View style={[styles.lastUpdatedContainer, { backgroundColor: colors.card }]}>
+               <Text style={[styles.lastUpdatedText, { color: colors.textMuted }]}>
+                  Updated: {lastUpdated.toLocaleTimeString()}
+               </Text>
+            </View>
+         )}
 
          {/* Center on me */}
          <TouchableOpacity style={[styles.centerButton, { backgroundColor: colors.primary }]} onPress={centerOnMe}>
@@ -180,7 +227,7 @@ export default function HangoutMapScreen() {
                         {selectedUser.city}, {selectedUser.country}
                      </Text>
                   )}
-                  {distanceKm !== null && <Text style={[styles.popupDistance, { color: colors.textMuted }]}>~{distanceKm.toFixed(1)} km away</Text>}
+                  {distanceKm !== null && <Text style={[styles.popupDistance, { color: colors.textMuted }]}>{formatDistance(distanceKm)} away</Text>}
 
                   <View style={styles.popupButtonsRow}>
                      <TouchableOpacity
@@ -246,6 +293,43 @@ const styles = StyleSheet.create({
       fontSize: 11,
       maxWidth: 80,
       textAlign: "center",
+   },
+
+   /* Refresh button */
+   refreshButton: {
+      position: "absolute",
+      top: 60,
+      right: 16,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+   },
+   
+   /* Last updated */
+   lastUpdatedContainer: {
+      position: "absolute",
+      top: 116,
+      right: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+   },
+   lastUpdatedText: {
+      fontSize: 11,
+      fontWeight: "500",
    },
 
    /* Center button */

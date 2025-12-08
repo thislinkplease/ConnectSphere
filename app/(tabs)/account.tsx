@@ -67,14 +67,14 @@ export default function AccountScreen() {
   }
 
   const renderInfoRow = (icon: string, label: string, value: string, onPress?: () => void) => (
-    <TouchableOpacity style={styles.infoRow} onPress={onPress} disabled={!onPress}>
+    <TouchableOpacity style={[styles.infoRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]} onPress={onPress} disabled={!onPress}>
       <View style={styles.infoRowLeft}>
-        <Ionicons name={icon as any} size={20} color="#666" />
-        <Text style={styles.infoLabel}>{label}</Text>
+        <Ionicons name={icon as any} size={20} color={colors.textSecondary} />
+        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
       </View>
       <View style={styles.infoRowRight}>
-        <Text style={styles.infoValue}>{value}</Text>
-        {onPress && <Ionicons name="chevron-forward" size={20} color="#ccc" />}
+        <Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text>
+        {onPress && <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />}
       </View>
     </TouchableOpacity>
   );
