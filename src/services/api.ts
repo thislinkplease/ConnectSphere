@@ -1,4 +1,3 @@
-import { fromUTCString } from "@/src/utils/date";
 import axios, { AxiosInstance } from "axios";
 import {
    Chat,
@@ -74,32 +73,36 @@ class ApiService {
          async (error) => {
             const originalRequest = error.config;
 
-            if (error.response) {
-               // Server responded with error
-               console.error("API Response Error:", error.response.status, error.response.data);
+            // 🟢 LỖI DO AI MODERATION
+            if (error.response && error.response.status === 403) {
+               // Không dùng console.error để tránh RN RedBox
+               console.warn("AI moderation blocked request:", error.response.data);
+               return Promise.reject(error); // FE sẽ vào catch → hiển thị Alert
+            }
 
-               // If 401 Unauthorized, user might need to re-login
-               if (error.response.status === 401 && !originalRequest._retry) {
-                  console.warn("Unauthorized - Token may be expired");
-                  // Don't retry, let the app handle re-login
-               }
-            } else if (error.request) {
-               // Request made but no response - possibly network issue
-               console.error("API No Response:", error.message);
+            // 🟡 Unauthorized (token hết hạn)
+            if (error.response && error.response.status === 401) {
+               console.warn("Unauthorized - Token may be expired");
+               return Promise.reject(error);
+            }
 
-               // Retry once for network errors
+            // 🔴 Lỗi network (không nhận được response)
+            if (error.request) {
+               console.warn("API No Response:", error.message);
+
                if (!originalRequest._retry) {
                   originalRequest._retry = true;
                   try {
                      return this.client(originalRequest);
                   } catch (retryError) {
-                     console.error("Retry failed:", retryError);
+                     return Promise.reject(retryError);
                   }
                }
-            } else {
-               // Error in request setup
-               console.error("API Request Setup Error:", error.message);
             }
+
+            // ⚪ Lỗi setup
+            console.warn("API Request Setup Error:", error.message);
+
             return Promise.reject(error);
          }
       );
@@ -139,12 +142,12 @@ class ApiService {
          .then((response) => {
             // Clean up from pending requests after completion
             pendingRequests.delete(cacheKey);
-            
+
             // Store in cache if TTL is provided
             if (cacheTTL) {
                CacheService.set(cacheKey, response.data, cacheTTL);
             }
-            
+
             return response.data;
          })
          .catch((error) => {
@@ -266,7 +269,7 @@ class ApiService {
    async searchUsers(query: string, filters?: ConnectionFilters): Promise<User[]> {
       // Cache search results for 30 seconds
       const params: any = { q: query };
-      
+
       // Add filter parameters if provided
       if (filters?.gender) {
          params.gender = filters.gender;
@@ -277,7 +280,7 @@ class ApiService {
       if (filters?.maxAge !== undefined) {
          params.max_age = filters.maxAge;
       }
-      
+
       const data: any[] = await this.deduplicatedGet("/users/search", params, 30000);
       return (data || []).map(mapServerUserToClient);
    }
@@ -406,19 +409,7 @@ class ApiService {
       return this.deduplicatedGet(`/users/${username}/profile-completion`);
    }
 
-   async searchEvents(query: string): Promise<Event[]> {
-      const response = await this.client.get("/events/search", { params: { q: query } });
-
-      return response.data.map((e: any) => ({
-         ...e,
-         dateStart: e.date_start,
-         dateEnd: e.date_end,
-         entranceFee: e.entrance_fee,
-         image_url: e.image_url,
-         address: e.address ?? e.location,
-      }));
-   }
-
+   // Event endpoints
    async getEvents(filters?: any): Promise<Event[]> {
       // Cache events for 1 minute - events don't change frequently
       const data = await this.deduplicatedGet<Event[]>("/events", filters, 60000);
@@ -429,39 +420,6 @@ class ApiService {
       // Cache for 30 seconds
       const data = await this.deduplicatedGet<Event[]>(`/events/user/${username}/${type}`, {}, 30000);
       return data;
-   }
-
-   async uploadEventImage(file: any): Promise<string> {
-      const formData = new FormData();
-
-      formData.append("image", {
-         uri: file.uri,
-         name: file.name,
-         type: file.type,
-      } as any);
-
-      const response = await this.client.post("/events/upload-image", formData, {
-         headers: {
-            "Content-Type": "multipart/form-data",
-         },
-      });
-
-      return response.data.publicUrl || response.data.url || response.data.image_url;
-   }
-
-   async createEvent(data: any): Promise<Event> {
-      const response = await this.client.post("/events", data);
-      return response.data;
-   }
-   async updateEvent(eventId: string, data: any): Promise<Event> {
-      const res = await this.client.put(`/events/${eventId}`, data);
-      return res.data;
-   }
-   async deleteEvent(eventId: string, username: string): Promise<any> {
-      const res = await this.client.delete(`/events/${eventId}`, {
-         params: { username },
-      });
-      return res.data;
    }
 
    async getEventById(eventId: string, viewer?: string): Promise<Event> {
@@ -490,6 +448,11 @@ class ApiService {
       });
    }
 
+   async searchEvents(query: string): Promise<Event[]> {
+      const response = await this.client.get("/events/search", { params: { q: query } });
+      return response.data;
+   }
+
    async inviteToEvent(eventId: string, inviterUsername: string, inviteeUsernames: string[]): Promise<void> {
       await this.client.post(`/events/${eventId}/invite`, {
          inviter_username: inviterUsername,
@@ -506,13 +469,17 @@ class ApiService {
       limit?: number;
    }): Promise<User[]> {
       // Cache for 30 seconds to reduce frequent API calls
-      const users = await this.deduplicatedGet(`/hangouts`, {
-         languages: params?.languages?.join(","),
-         distance_km: params?.distance_km,
-         user_lat: params?.user_lat,
-         user_lng: params?.user_lng,
-         limit: params?.limit,
-      }, 30000); // 30 second cache
+      const users = await this.deduplicatedGet(
+         `/hangouts`,
+         {
+            languages: params?.languages?.join(","),
+            distance_km: params?.distance_km,
+            user_lat: params?.user_lat,
+            user_lng: params?.user_lng,
+            limit: params?.limit,
+         },
+         30000
+      ); // 30 second cache
 
       // Map server user data to client format, ensuring we have an array
       if (!users || !Array.isArray(users)) {
