@@ -47,6 +47,9 @@ export default function ConnectionScreen() {
    const [events, setEvents] = useState<any[]>([]);
    const [searchEvent, setSearchEvent] = useState("");
 
+   const [recommendedUsers, setRecommendedUsers] = useState<User[]>([]);
+   const [recommendedLoading, setRecommendedLoading] = useState(false);
+
    const loadEvents = async () => {
       try {
          setLoading(true);
@@ -96,7 +99,7 @@ export default function ConnectionScreen() {
    const loadUsers = useCallback(async () => {
       try {
          setLoading(true);
-         
+
          // Build filter object to pass to API
          const filters: ConnectionFilters = {};
          if (selectedGender) {
@@ -107,7 +110,7 @@ export default function ConnectionScreen() {
             filters.minAge = ageRange[0];
             filters.maxAge = ageRange[1];
          }
-         
+
          if (searchUser.trim()) {
             // Search with filters
             const data = await ApiService.searchUsers(searchUser, filters);
@@ -216,13 +219,15 @@ export default function ConnectionScreen() {
       const isFollowing = followingUsers.has(item.id);
 
       return (
-         <TouchableOpacity style={styles.userCard} onPress={() => {
-            if (item.username === currentUser?.username) {
-               router.push("/account");
-            } else {
-               router.push(`/account/profile?username=${item.username}`);
-            }
-         }}
+         <TouchableOpacity
+            style={styles.userCard}
+            onPress={() => {
+               if (item.username === currentUser?.username) {
+                  router.push("/account");
+               } else {
+                  router.push(`/account/profile?username=${item.username}`);
+               }
+            }}
          >
             <Image source={{ uri: item.avatar }} style={styles.userAvatar} />
             <View style={styles.userContent}>
@@ -354,6 +359,75 @@ export default function ConnectionScreen() {
       );
    };
 
+   useEffect(() => {
+      const loadRec = async () => {
+         if (!currentUser?.username) return;
+         try {
+            setRecommendedLoading(true);
+            const rec = await ApiService.fetchRecommendedUsers(currentUser.username);
+            // console.log("Recommended users count:", rec?.length ?? 0);
+            setRecommendedUsers(rec || []);
+         } catch (e) {
+            console.error("Error loading recommended users:", e);
+            setRecommendedUsers([]);
+         } finally {
+            setRecommendedLoading(false);
+         }
+      };
+
+      loadRec();
+   }, [currentUser?.username]);
+
+   const renderRecommendedCard = ({ item }: { item: User }) => {
+      return (
+         <TouchableOpacity
+            style={{
+               width: 150,
+               marginRight: 14,
+               backgroundColor: "#fff",
+               borderRadius: 12,
+               padding: 10,
+               alignItems: "center",
+               shadowColor: "#000",
+               shadowOpacity: 0.2,
+               shadowRadius: 4,
+               elevation: 2,
+            }}
+            onPress={() => {
+               if (item.username === currentUser?.username) {
+                  router.push("/account");
+               } else {
+                  router.push(`/account/profile?username=${item.username}`);
+               }
+            }}
+         >
+            <Image source={{ uri: item.avatar }} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 8 }} />
+
+            <Text numberOfLines={1} style={{ fontWeight: "600", fontSize: 15, marginBottom: 6 }}>
+               {item.name}
+            </Text>
+
+            {item.interests?.slice(0, 3).map((interest, index) => (
+               <View
+                  key={index}
+                  style={{
+                     backgroundColor: "#f0f0f0",
+                     paddingHorizontal: 8,
+                     paddingVertical: 4,
+                     borderRadius: 10,
+                     justifyContent: "center",
+                     alignItems: "center",
+                     marginRight: 6,
+                     marginTop: 4,
+                  }}
+               >
+                  <Text style={{ fontSize: 12, textAlign: "center", color: "#555" }}>{interest}</Text>
+               </View>
+            ))}
+         </TouchableOpacity>
+      );
+   };
+
    return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
          <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -410,6 +484,7 @@ export default function ConnectionScreen() {
                )}
             </View>
          </TouchableWithoutFeedback>
+
          {viewMode === "users" &&
             (loading && !refreshing ? (
                <View style={styles.loadingContainer}>
@@ -422,6 +497,49 @@ export default function ConnectionScreen() {
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={styles.listContent}
                   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                  // header recommended
+                  ListHeaderComponent={
+                     <View>
+                        <View style={{ marginBottom: 16 }}>
+                           <Text
+                              style={{
+                                 fontSize: 18,
+                                 fontWeight: "700",
+                                 marginLeft: 9,
+                                 marginBottom: 6,
+                              }}
+                           >
+                              Recommended For You
+                           </Text>
+
+                           {recommendedLoading ? (
+                              <View style={{ paddingVertical: 8 }}>
+                                 <ActivityIndicator size="small" color={colors.primary} />
+                              </View>
+                           ) : recommendedUsers.length === 0 ? (
+                              <Text
+                                 style={{
+                                    marginLeft: 10,
+                                    marginBottom: 4,
+                                    color: "#999",
+                                    fontSize: 13,
+                                 }}
+                              >
+                                 No recommendations yet.
+                              </Text>
+                           ) : (
+                              <FlatList
+                                 horizontal
+                                 data={recommendedUsers}
+                                 renderItem={renderRecommendedCard}
+                                 keyExtractor={(item) => item.id}
+                                 showsHorizontalScrollIndicator={false}
+                                 contentContainerStyle={{ paddingHorizontal: 5, paddingBottom: 10 }}
+                              />
+                           )}
+                        </View>
+                     </View>
+                  }
                   ListEmptyComponent={
                      <View style={styles.emptyContainer}>
                         <Ionicons name="people-outline" size={64} color="#ccc" />

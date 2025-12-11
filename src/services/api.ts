@@ -254,6 +254,11 @@ class ApiService {
       });
    }
 
+   async fetchRecommendedUsers(username: string): Promise<User[]> {
+      const res = await this.client.get(`/users/${username}/recommendations`);
+      return res.data;
+   }
+
    async getUsers(filters?: ConnectionFilters): Promise<User[]> {
       // Cache for 1 minute to reduce API calls
       const data: any[] = await this.deduplicatedGet("/users", filters, 60000);
