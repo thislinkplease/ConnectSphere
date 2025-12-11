@@ -388,7 +388,7 @@ export default function ConnectionScreen() {
                borderRadius: 12,
                padding: 10,
                alignItems: "center",
-               shadowColor: "#000",
+            //   shadowColor: "#000",
                shadowOpacity: 0.2,
                shadowRadius: 4,
                elevation: 2,
@@ -534,7 +534,7 @@ export default function ConnectionScreen() {
                                  renderItem={renderRecommendedCard}
                                  keyExtractor={(item) => item.id}
                                  showsHorizontalScrollIndicator={false}
-                                 contentContainerStyle={{ paddingHorizontal: 5, paddingBottom: 10 }}
+                                 contentContainerStyle={{ paddingHorizontal: 5, paddingBottom: 15, paddingTop: 6 }}
                               />
                            )}
                         </View>

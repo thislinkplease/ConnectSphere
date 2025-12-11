@@ -414,6 +414,37 @@ class ApiService {
       return this.deduplicatedGet(`/users/${username}/profile-completion`);
    }
 
+   //event image
+   async uploadEventImage(file: any): Promise<string> {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await this.client.post("/events/upload-image", formData, {
+         headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      return response.data.publicUrl; // BE trả về publicUrl
+   }
+
+   //create event
+   async createEvent(data: any): Promise<Event> {
+      const response = await this.client.post("/events", data);
+      return response.data;
+   }
+
+   //delete event
+   async deleteEvent(eventId: string, username: string): Promise<void> {
+      await this.client.delete(`/events/${eventId}`, {
+         params: { username },
+      });
+   }
+
+   //update event
+   async updateEvent(eventId: string, data: any): Promise<Event> {
+      const response = await this.client.put(`/events/${eventId}`, data);
+      return response.data;
+   }
+
    // Event endpoints
    async getEvents(filters?: any): Promise<Event[]> {
       // Cache events for 1 minute - events don't change frequently
