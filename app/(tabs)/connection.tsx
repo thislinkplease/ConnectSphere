@@ -27,8 +27,8 @@ export default function ConnectionScreen() {
    const { colors } = useTheme();
    const [users, setUsers] = useState<User[]>([]);
    const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+   const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
    const [searchQuery, setSearchQuery] = useState("");
-   const [viewMode, setViewMode] = useState<"users" | "events">("users");
    const [loading, setLoading] = useState(true);
    const [refreshing, setRefreshing] = useState(false);
    const [showFilters, setShowFilters] = useState(false);
@@ -40,30 +40,71 @@ export default function ConnectionScreen() {
    const [selectedGender, setSelectedGender] = useState<"Male" | "Female" | null>(null);
    const [ageRange, setAgeRange] = useState<[number, number]>([18, 65]);
 
-   const [events, setEvents] = useState<any[]>([]);
-
-   const loadEvents = async () => {
-      try {
-         setLoading(true);
-         const data = await ApiService.getEvents();
-         setEvents(data);
-      } catch (error) {
-         console.log("Error loading events:", error);
-      } finally {
-         setLoading(false);
-      }
-   };
-
-   useEffect(() => {
-      if (viewMode === "events") {
-         loadEvents();
-      }
-   }, [viewMode]);
-
    useEffect(() => {
       // Request location permission on mount
       requestLocation();
+      // Load following users to exclude from suggestions
+      loadFollowingUsers();
    }, []);
+
+   // Load users that current user is following
+   const loadFollowingUsers = async () => {
+      if (!currentUser?.username) return;
+      try {
+         const following = await ApiService.getFollowing(currentUser.username);
+         const followingSet = new Set(following.map((u: User) => u.id));
+         setFollowingUsers(followingSet);
+      } catch (error) {
+         console.log("Error loading following users:", error);
+      }
+   };
+
+   // Smart friend suggestions:
+   // 1. Prioritize users with common interests
+   // 2. Exclude users already following
+   const loadSuggestedUsers = useCallback(async () => {
+      if (!currentUser?.username) return;
+      
+      try {
+         // Get users (API limits results, no need for client-side pagination)
+         const allUsers = await ApiService.getUsers();
+         
+         // Filter out current user and users already following
+         let candidates = allUsers.filter((u: User) => {
+            // Exclude current user
+            if (u.username === currentUser.username) return false;
+            // Exclude users already following
+            if (followingUsers.has(u.id)) return false;
+            return true;
+         });
+
+         // Score each user based on common interests
+         const scoredUsers = candidates.map((user: User) => {
+            const currentInterests = currentUser.interests || [];
+            const userInterests = user.interests || [];
+            const commonInterests = currentInterests.filter(
+               (interest: string) => userInterests.includes(interest)
+            );
+            // Score = number of common interests
+            return { user, score: commonInterests.length };
+         });
+
+         // Sort by score (highest first = most common interests) and take top 10
+         scoredUsers.sort((a, b) => b.score - a.score);
+         const topSuggestions = scoredUsers.slice(0, 10).map(s => s.user);
+
+         setSuggestedUsers(topSuggestions);
+      } catch (error) {
+         console.log("Error loading suggested users:", error);
+      }
+   }, [currentUser, followingUsers]);
+
+   // Load suggestions when dependencies are ready
+   useEffect(() => {
+      if (currentUser?.username) {
+         loadSuggestedUsers();
+      }
+   }, [currentUser?.username, followingUsers, loadSuggestedUsers]);
 
    const requestLocation = async () => {
       const hasPermission = await LocationService.hasPermissions();
@@ -155,7 +196,8 @@ export default function ConnectionScreen() {
 
    const onRefresh = useCallback(async () => {
       setRefreshing(true);
-      await loadUsers();
+      // Refresh users and following list; suggestions auto-update when followingUsers changes
+      await Promise.all([loadUsers(), loadFollowingUsers()]);
       setRefreshing(false);
    }, [loadUsers]);
 
@@ -273,61 +315,40 @@ export default function ConnectionScreen() {
       );
    };
 
-   const renderEventCard = ({ item }: { item: any }) => {
-      const date = new Date(item.date_start);
-      const day = date.getDate();
-      const month = date.toLocaleString("en-US", { month: "short" });
-      const timeStart = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+   // Render suggestion card for horizontal scroll
+   const renderSuggestionCard = ({ item }: { item: User }) => {
+      const isFollowing = followingUsers.has(item.id);
 
       return (
-         <TouchableOpacity style={styles.eventCard} onPress={() => router.push(`/events/event-detail?id=${item.id}`)}>
-            {/* Banner */}
-            <Image
-               source={{ uri: item.image_url || "https://via.placeholder.com/400x250" }}
-               style={styles.eventBanner}
-            />
-
-            {/* Time + distance badge */}
-            <View style={styles.eventBadge}>
-               <Ionicons name="time-outline" size={14} color="#0D8D43" />
-               <Text style={styles.eventBadgeText}>{timeStart}</Text>
-
-               {item.distance && (
-                  <>
-                     <Ionicons name="location-outline" size={14} color="#888" style={{ marginLeft: 6 }} />
-                     <Text style={styles.eventDistance}>{item.distance.toFixed(1)} km</Text>
-                  </>
-               )}
-            </View>
-
-            {/* Bottom info */}
-            <View style={styles.eventInfoBox}>
-               {/* Date Column */}
-               <View style={styles.eventDateCol}>
-                  <Text style={styles.eventDay}>{day}</Text>
-                  <Text style={styles.eventMonth}>{month}</Text>
-               </View>
-
-               {/* Content */}
-               <View style={{ flex: 1 }}>
-                  <Text numberOfLines={2} style={styles.eventTitle}>
-                     {item.name}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.eventAddress}>
-                     {item.address}
-                  </Text>
-
-                  <Text style={[styles.eventFee, { color: item.entrance_fee === "Free" ? "#0A8F29" : "#D32F2F" }]}>
-                     {item.entrance_fee || "Free"}
-                  </Text>
-
-                  {item.category && (
-                     <View style={styles.eventTag}>
-                        <Text style={styles.eventTagText}>{item.category}</Text>
-                     </View>
-                  )}
-               </View>
-            </View>
+         <TouchableOpacity 
+            style={styles.suggestionCard}
+            onPress={() => {
+               if (item.username === currentUser?.username) {
+                  router.push("/account");
+               } else {
+                  router.push(`/account/profile?username=${item.username}`);
+               }
+            }}
+         >
+            <Image source={{ uri: item.avatar }} style={styles.suggestionAvatar} />
+            <Text style={styles.suggestionName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.suggestionLocation} numberOfLines={1}>
+               {item.city ? `${item.city}` : ''}
+            </Text>
+            <TouchableOpacity
+               style={[
+                  styles.suggestionFollowButton,
+                  isFollowing && { backgroundColor: colors.primary },
+                  !isFollowing && { borderColor: colors.primary, borderWidth: 1.5 },
+               ]}
+               onPress={(e) => handleFollowToggle(item, e)}
+            >
+               <Ionicons
+                  name={isFollowing ? "checkmark" : "person-add-outline"}
+                  size={16}
+                  color={isFollowing ? "#fff" : colors.primary}
+               />
+            </TouchableOpacity>
          </TouchableOpacity>
       );
    };
@@ -353,62 +374,43 @@ export default function ConnectionScreen() {
             </TouchableOpacity>
          </View>
 
-         <View style={[styles.viewModeToggle, { backgroundColor: colors.card }]}>
-            <TouchableOpacity
-               style={[
-                  styles.viewModeButton,
-                  viewMode === "users" && [styles.viewModeButtonActive, { backgroundColor: colors.primary }],
-               ]}
-               onPress={() => setViewMode("users")}
-            >
-               <Text style={[styles.viewModeText, viewMode === "users" && styles.viewModeTextActive]}>Users</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-               style={[
-                  styles.viewModeButton,
-                  viewMode === "events" && [styles.viewModeButtonActive, { backgroundColor: colors.primary }],
-               ]}
-               onPress={() => setViewMode("events")}
-            >
-               <Text style={[styles.viewModeText, viewMode === "events" && styles.viewModeTextActive]}>All Events</Text>
-            </TouchableOpacity>
-         </View>
-
-         {viewMode === "users" &&
-            (loading && !refreshing ? (
-               <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-               </View>
-            ) : (
-               <FlatList
-                  data={filteredUsers}
-                  renderItem={renderUserCard}
-                  keyExtractor={(item) => item.id}
-                  contentContainerStyle={styles.listContent}
-                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                  ListEmptyComponent={
-                     <View style={styles.emptyContainer}>
-                        <Ionicons name="people-outline" size={64} color="#ccc" />
-                        <Text style={styles.emptyText}>No users found</Text>
+         {loading && !refreshing ? (
+            <View style={styles.loadingContainer}>
+               <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+         ) : (
+            <FlatList
+               data={filteredUsers}
+               renderItem={renderUserCard}
+               keyExtractor={(item) => item.id}
+               contentContainerStyle={styles.listContent}
+               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+               ListHeaderComponent={
+                  suggestedUsers.length > 0 ? (
+                     <View style={styles.suggestionsContainer}>
+                        <View style={styles.suggestionsHeader}>
+                           <Text style={[styles.suggestionsTitle, { color: colors.text }]}>Suggestions</Text>
+                           <Text style={[styles.suggestionsSubtitle, { color: colors.textMuted }]}>People you may know</Text>
+                        </View>
+                        <FlatList
+                           data={suggestedUsers}
+                           renderItem={renderSuggestionCard}
+                           keyExtractor={(item) => `suggestion-${item.id}`}
+                           horizontal
+                           showsHorizontalScrollIndicator={false}
+                           contentContainerStyle={styles.suggestionsList}
+                        />
                      </View>
-                  }
-               />
-            ))}
-
-         {viewMode === "events" &&
-            (loading ? (
-               <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-               </View>
-            ) : (
-               <FlatList
-                  data={events}
-                  renderItem={renderEventCard}
-                  keyExtractor={(item) => String(item.id)}
-                  contentContainerStyle={{ padding: 12 }}
-                  showsVerticalScrollIndicator={false}
-               />
-            ))}
+                  ) : null
+               }
+               ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                     <Ionicons name="people-outline" size={64} color="#ccc" />
+                     <Text style={styles.emptyText}>No users found</Text>
+                  </View>
+               }
+            />
+         )}
 
          {/* Filter Modal */}
          <Modal
@@ -761,99 +763,62 @@ const styles = StyleSheet.create({
       fontWeight: "600",
    },
 
-   //event card styles
-   eventCard: {
+   // Suggestion card styles
+   suggestionsContainer: {
+      marginBottom: 16,
+   },
+   suggestionsHeader: {
+      paddingHorizontal: 4,
+      marginBottom: 12,
+   },
+   suggestionsTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+   },
+   suggestionsSubtitle: {
+      fontSize: 13,
+      marginTop: 2,
+   },
+   suggestionsList: {
+      paddingRight: 12,
+   },
+   suggestionCard: {
       backgroundColor: "#fff",
-      borderRadius: 16,
-      overflow: "hidden",
-      marginBottom: 20,
+      borderRadius: 12,
+      padding: 12,
+      marginRight: 12,
+      width: 120,
+      alignItems: "center",
       elevation: 2,
       shadowColor: "#000",
-      shadowOpacity: 0.08,
-      shadowOffset: { width: 0, height: 3 },
-      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
    },
-
-   eventBanner: {
-      width: "100%",
-      height: 170,
+   suggestionAvatar: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      marginBottom: 8,
    },
-
-   eventBadge: {
-      position: "absolute",
-      bottom: 14,
-      left: 14,
+   suggestionName: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: "#333",
+      textAlign: "center",
+   },
+   suggestionLocation: {
+      fontSize: 11,
+      color: "#666",
+      textAlign: "center",
+      marginBottom: 8,
+   },
+   suggestionFollowButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: "#fff",
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 20,
-      flexDirection: "row",
+      justifyContent: "center",
       alignItems: "center",
-      elevation: 3,
-   },
-
-   eventBadgeText: {
-      fontWeight: "600",
-      marginLeft: 4,
-      fontSize: 13,
-   },
-
-   eventDistance: {
-      marginLeft: 4,
-      fontSize: 12,
-      color: "#666",
-   },
-
-   eventInfoBox: {
-      flexDirection: "row",
-      padding: 16,
-   },
-
-   eventDateCol: {
-      width: 48,
-      alignItems: "center",
-      marginRight: 10,
-   },
-
-   eventDay: {
-      fontSize: 22,
-      fontWeight: "700",
-      color: "#222",
-   },
-   eventMonth: {
-      fontSize: 14,
-      color: "#888",
-      marginTop: -2,
-   },
-
-   eventTitle: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: "#222",
-      marginBottom: 4,
-   },
-   eventAddress: {
-      fontSize: 13,
-      color: "#666",
-      marginBottom: 6,
-   },
-   eventFee: {
-      fontSize: 14,
-      fontWeight: "600",
-      marginBottom: 3,
-      marginLeft: 35,
-   },
-
-   eventTag: {
-      backgroundColor: "#E6F6EE",
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 8,
-      alignSelf: "flex-start",
-   },
-   eventTagText: {
-      fontSize: 12,
-      color: "#0D8D43",
-      fontWeight: "600",
    },
 });

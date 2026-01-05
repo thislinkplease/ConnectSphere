@@ -19,6 +19,7 @@ import { useTheme } from '@/src/context/ThemeContext';
 import { useAuth } from '@/src/context/AuthContext';
 import communityService from '@/src/services/communityService';
 import ImageService from '@/src/services/image';
+import WebSocketService from '@/src/services/websocket';
 
 export default function CreateCommunityScreen() {
   const router = useRouter();
@@ -108,6 +109,13 @@ export default function CreateCommunityScreen() {
           console.warn('Failed to upload cover image:', err);
           // Continue anyway, community was created
         }
+      }
+
+      // Notify WebSocket to join the community chat immediately
+      // This ensures the community chat appears in Inbox without app restart
+      if (community.id && user.username) {
+        WebSocketService.notifyCommunityJoined(community.id, user.username);
+        WebSocketService.joinCommunityChat(community.id);
       }
 
       Alert.alert('Success', 'Community created successfully!', [

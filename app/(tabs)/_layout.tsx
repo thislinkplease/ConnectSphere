@@ -62,7 +62,7 @@ export default function TabLayout() {
                     tabBarLabel: ({ focused, color }) => (
                         <View style={styles.labelContainer}>
                             <Text style={[styles.tabLabel, { color: focused ? color : '#999' }]}>
-                                {focused ? '' : 'Hangout'}
+                                {focused ? '' : 'Matching'}
                             </Text>
                         </View>
                     ),
