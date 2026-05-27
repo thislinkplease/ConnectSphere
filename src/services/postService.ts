@@ -23,6 +23,59 @@ class PostService {
     return res.data;
   }
 
+  // CREATE POST WITH MEDIA
+  async createWithMedia (data: {
+    author_username: string;
+    content?: string;
+    audience?: string;
+    disable_comments?: boolean;
+    hide_like_count?: boolean;
+    community_id?: number | null;
+    status?: string | null;
+    media?: {
+      uri: string;
+      name?: string;
+      type?: string;
+    }[];
+  }) {
+    const formData = new FormData();
+
+    formData.append("author_username", data.author_username);
+    formData.append("content", data.content || "");
+    formData.append("audience", data.audience || "followers");
+    formData.append("disable_comments", String(!!data.disable_comments));
+    formData.append("hide_like_count", String(!!data.hide_like_count));
+
+    if (data.community_id !== undefined && data.community_id !== null) {
+      formData.append("community_id", String(data.community_id));
+    }
+
+    if (data.status) {
+      formData.append("status", data.status);
+    }
+
+    if (data.media && data.media.length > 0) {
+      data.media.forEach((file, index) => {
+        const fileName = file.name || `media_${Date.now()}_${index}`;
+        const mimeType = file.type || "image/jpeg";
+
+        formData.append("media", {
+          uri: file.uri,
+          name: fileName,
+          type: mimeType,
+        } as any);
+      });
+    }
+
+    const response = await ApiService.client.post("/posts", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data;
+  }
+
   // UPDATE POST
   async update(
     postId: number,

@@ -198,19 +198,16 @@ export default function PostScreen() {
         return;
       }
 
-      const created = await postService.create({
+      await postService.createWithMedia({
         author_username: meUsername,
         content: caption,
         audience,
         disable_comments: disableComments,
         hide_like_count: hideLikeCount,
         community_id: Number(communityId),
-        status: status,
+        status,
+        media: selectedMedia as any,
       });
-
-      if (selectedMedia.length > 0) {
-        await postService.uploadMedia(created.id, selectedMedia as any);
-      }
 
       if (community?.requires_post_approval && !isAdmin) {
         Alert.alert("Pending Approval", "Your post is awaiting admin review.");
@@ -220,10 +217,26 @@ export default function PostScreen() {
 
       router.back();
       
-    } catch (error) {
+    } catch (error: any) {
       setIsSubmitting(false);
       console.error(error);
-      Alert.alert("Error", "Unable to process the request.");
+
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to process the request.";
+
+      const violations = error?.response?.data?.violations;
+
+      if (violations?.length) {
+        const detail = violations
+          .map((v: any) => `${v.type}: ${v.label} (${Math.round(v.confidence * 100)}%)`)
+          .join("\n");
+
+        Alert.alert("Content blocked", `${message}\n\n${detail}`);
+      } else {
+        Alert.alert("Error", message);
+      }
     }
   };
 
