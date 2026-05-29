@@ -125,7 +125,7 @@ export default function PostScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
-      quality: 0.9,
+      quality: 0.7,
     });
     if (!result.canceled) {
       const picked = (result.assets || []).map((a, idx) => ({
@@ -219,18 +219,31 @@ export default function PostScreen() {
       
     } catch (error: any) {
       setIsSubmitting(false);
-      console.error(error);
+
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      const violations = data?.violations;
+
+      const isModerationBlocked =
+        status === 400 &&
+        Array.isArray(violations) &&
+        violations.length > 0;
+
+      if (!isModerationBlocked) {
+        console.error(error);
+      }
 
       const message =
-        error?.response?.data?.message ||
+        data?.message ||
         error?.message ||
         "Unable to process the request.";
 
-      const violations = error?.response?.data?.violations;
-
-      if (violations?.length) {
+      if (isModerationBlocked) {
         const detail = violations
-          .map((v: any) => `${v.type}: ${v.label} (${Math.round(v.confidence * 100)}%)`)
+          .map((v: any) => {
+            const percent = Math.round(Number(v.confidence || 0) * 100);
+            return `${v.type}: ${v.label} (${percent}%)`;
+          })
           .join("\n");
 
         Alert.alert("Content blocked", `${message}\n\n${detail}`);

@@ -71,6 +71,7 @@ class PostService {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      timeout: 120000,
     });
 
     return response.data;
@@ -116,6 +117,7 @@ class PostService {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      timeout: 120000,
     });
 
     return res.data;

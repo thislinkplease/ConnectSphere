@@ -71,34 +71,42 @@ class ApiService {
             return response;
          },
          async (error) => {
-            const originalRequest = error.config;
+            const originalRequest = error.config || {};
 
             if (error.response) {
-               // Server responded with error
-               console.error("API Response Error:", error.response.status, error.response.data);
+               const status = error.response.status;
+               const data = error.response.data;
 
-               // If 401 Unauthorized, user might need to re-login
-               if (error.response.status === 401 && !originalRequest._retry) {
+               const isModerationBlocked =
+                  status === 400 &&
+                  Array.isArray(data?.violations) &&
+                  data.violations.length > 0;
+
+               // AI moderation block là flow hợp lệ, không log lỗi đỏ
+               if (!isModerationBlocked) {
+                  console.error("API Response Error:", status, data);
+               }
+
+               if (status === 401 && !originalRequest._retry) {
                   console.warn("Unauthorized - Token may be expired");
-                  // Don't retry, let the app handle re-login
                }
             } else if (error.request) {
-               // Request made but no response - possibly network issue
-               console.error("API No Response:", error.message);
+               // Server không phản hồi / mất mạng / sai API URL
+               console.warn("API Network Error:", error.message);
 
-               // Retry once for network errors
                if (!originalRequest._retry) {
                   originalRequest._retry = true;
+
                   try {
                      return this.client(originalRequest);
-                  } catch (retryError) {
-                     console.error("Retry failed:", retryError);
+                  } catch (retryError: any) {
+                     console.warn("API retry failed:", retryError?.message || retryError);
                   }
                }
             } else {
-               // Error in request setup
                console.error("API Request Setup Error:", error.message);
             }
+
             return Promise.reject(error);
          }
       );
